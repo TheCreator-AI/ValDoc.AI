@@ -204,6 +204,24 @@ export const ensureDatabaseInitialized = async () => {
   `);
   await prismaWithRaw.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS \"AccessReviewReport_organizationId_createdAt_idx\" ON \"AccessReviewReport\"(\"organizationId\", \"createdAt\")");
   await prismaWithRaw.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "AppRelease" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "organizationId" TEXT NOT NULL,
+      "buildVersion" TEXT NOT NULL,
+      "releaseDate" DATETIME NOT NULL,
+      "changeSummary" TEXT NOT NULL,
+      "riskImpact" TEXT NOT NULL,
+      "approvedSignatureId" TEXT,
+      "approvedByUserId" TEXT,
+      "deployedAt" DATETIME,
+      "createdByUserId" TEXT NOT NULL,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await prismaWithRaw.$executeRawUnsafe("CREATE UNIQUE INDEX IF NOT EXISTS \"AppRelease_organizationId_buildVersion_key\" ON \"AppRelease\"(\"organizationId\", \"buildVersion\")");
+  await prismaWithRaw.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS \"AppRelease_organizationId_releaseDate_idx\" ON \"AppRelease\"(\"organizationId\", \"releaseDate\")");
+  await prismaWithRaw.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "UserSession" (
       "id" TEXT NOT NULL PRIMARY KEY,
       "organizationId" TEXT NOT NULL,

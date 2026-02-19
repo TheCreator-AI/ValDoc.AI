@@ -124,6 +124,7 @@ model Organization {
   purgeRuns RetentionPurgeRun[]
   accessReviewReports AccessReviewReport[]
   sessions UserSession[]
+  appReleases AppRelease[]
 }
 
 model DeploymentConfig {
@@ -166,6 +167,8 @@ model User {
   legalHoldsReleased LegalHold[] @relation("LegalHoldReleasedBy")
   purgeRuns RetentionPurgeRun[] @relation("RetentionPurgeRunActor")
   accessReviewReports AccessReviewReport[] @relation("AccessReviewReportCreator")
+  appReleasesCreated AppRelease[] @relation("AppReleaseCreator")
+  appReleasesApproved AppRelease[] @relation("AppReleaseApprover")
 }
 
 model Machine {
@@ -535,9 +538,32 @@ model ElectronicSignature {
   createdAt         DateTime         @default(now())
   organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   signer            User             @relation("ElectronicSignatureSigner", fields: [signerUserId], references: [id], onDelete: Cascade)
+  appReleaseApprovals AppRelease[]
 
   @@index([organizationId, recordType, recordId, recordVersionId])
   @@index([organizationId, signedAt])
+}
+
+model AppRelease {
+  id                 String               @id @default(cuid())
+  organizationId     String
+  buildVersion       String
+  releaseDate        DateTime
+  changeSummary      String
+  riskImpact         String
+  approvedSignatureId String?
+  approvedByUserId   String?
+  deployedAt         DateTime?
+  createdByUserId    String
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy          User                 @relation("AppReleaseCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  approvedBy         User?                @relation("AppReleaseApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  approvedSignature  ElectronicSignature? @relation(fields: [approvedSignatureId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, buildVersion])
+  @@index([organizationId, releaseDate])
 }
 
 model TraceabilityLink {

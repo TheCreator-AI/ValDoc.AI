@@ -12,7 +12,9 @@ const mustExist = [
   "04-iq-protocol.md",
   "05-oq-protocol.md",
   "06-traceability-matrix.csv",
-  "07-validation-summary-report-template.md"
+  "07-validation-summary-report-template.md",
+  "08-functional-compliance-overview.md",
+  "09-user-manual.md"
 ];
 
 describe("validation package artifacts", () => {
