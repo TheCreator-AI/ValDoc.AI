@@ -155,6 +155,7 @@ Optional local seeded demo user (if `npm run db:seed`):
 - `GET/POST /api/admin/organizations`
 - `DELETE /api/admin/organizations/{organizationId}`
 - `GET /api/admin/system-time-status`
+- `POST /api/admin/evidence/export?date_from&date_to`
 - `GET/PUT /api/admin/retention/config`
 - `GET/POST /api/admin/retention/legal-holds`
 - `POST /api/admin/retention/legal-holds/{holdId}/release`

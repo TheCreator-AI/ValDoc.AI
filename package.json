@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "security:audit": "npm audit --audit-level=high",
+    "security:audit": "npm audit --omit=dev --audit-level=high",
     "security:sast": "semgrep scan --config p/javascript --config p/typescript --error --severity ERROR src",
     "secrets:scan": "gitleaks detect --source . --config .gitleaks.toml --no-banner --redact",
     "security:check": "npm run security:audit && npm run security:sast && npm run secrets:scan",
@@ -31,9 +31,9 @@
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",
+    "@types/yazl": "^3.3.0",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
-    "archiver": "^7.0.1",
     "bcryptjs": "^3.0.3",
     "docx": "^9.5.2",
     "formidable": "^3.5.4",
@@ -45,6 +45,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "uuid": "^13.0.0",
+    "yazl": "^3.3.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {

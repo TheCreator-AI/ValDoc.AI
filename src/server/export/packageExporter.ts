@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { createHash, randomUUID } from "node:crypto";
-import archiver from "archiver";
+import { ZipFile } from "yazl";
 import PDFDocument from "pdfkit/js/pdfkit.standalone.js";
 import { prisma } from "@/server/db/prisma";
 import { buildDocxExportModel, renderDefaultDocx, type SignatureRow } from "@/server/export/defaultDocxRenderer";
@@ -85,16 +85,16 @@ export const exportJobAsZip = async (organizationId: string, jobId: string) => {
 
   await new Promise<void>((resolve, reject) => {
     const output = fs.createWriteStream(zipPath);
-    const archive = archiver("zip", { zlib: { level: 9 } });
+    const zip = new ZipFile();
 
     output.on("close", () => resolve());
-    archive.on("error", (error) => reject(error));
-
-    archive.pipe(output);
+    output.on("error", (error) => reject(error));
+    zip.outputStream.on("error", (error) => reject(error));
+    zip.outputStream.pipe(output);
 
     for (const document of job.documents) {
       const name = `${document.docType}-${toSafeName(document.title)}.md`;
-      archive.append(document.currentContent, { name });
+      zip.addBuffer(Buffer.from(document.currentContent, "utf8"), name);
 
       if (document.traceLinks.length > 0) {
         const traceCsv = [
@@ -104,11 +104,11 @@ export const exportJobAsZip = async (organizationId: string, jobId: string) => {
           )
         ].join("\n");
 
-        archive.append(traceCsv, { name: `${document.docType}-traceability.csv` });
+        zip.addBuffer(Buffer.from(traceCsv, "utf8"), `${document.docType}-traceability.csv`);
       }
     }
 
-    archive.finalize().catch(reject);
+    zip.end();
   });
 
   return zipPath;
