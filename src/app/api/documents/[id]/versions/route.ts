@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { ApiError, apiJson, getSessionOrThrow } from "@/server/api/http";
-import { createDocumentVersion } from "@/server/documents/lifecycle";
+import { createDocumentVersion, listDocumentVersionHistory } from "@/server/documents/lifecycle";
 
 const payloadSchema = z.object({
   content_json: z.string().optional(),
-  change_reason: z.string().min(1, "change_reason is required.")
+  change_reason: z.string().min(1, "change_reason is required."),
+  correction: z.boolean().optional()
 });
 
 export async function POST(
@@ -22,6 +23,7 @@ export async function POST(
       actorUserId: session.userId,
       changeReason: body.change_reason,
       contentJson: body.content_json,
+      correction: body.correction ?? false,
       request
     });
 
@@ -37,3 +39,26 @@ export async function POST(
   }
 }
 
+
+
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getSessionOrThrow("ENGINEER");
+    const { id } = await context.params;
+
+    const history = await listDocumentVersionHistory({
+      organizationId: session.organizationId,
+      documentId: id
+    });
+
+    return apiJson(200, history);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return apiJson(error.status, { error: error.message });
+    }
+    return apiJson(500, { error: "Failed to list document version history." });
+  }
+}

@@ -8,7 +8,8 @@ process.env.ORG_NAME = process.env.ORG_NAME ?? "QA Organization";
 const mocks = vi.hoisted(() => ({
   getSessionOrThrow: vi.fn(),
   writeAuditEvent: vi.fn(),
-  verifySessionToken: vi.fn()
+  verifySessionToken: vi.fn(),
+  userSessionUpdate: vi.fn()
 }));
 
 vi.mock("@/server/auth/token", () => ({
@@ -31,6 +32,14 @@ vi.mock("@/server/audit/events", () => ({
   writeAuditEvent: mocks.writeAuditEvent
 }));
 
+vi.mock("@/server/db/prisma", () => ({
+  prisma: {
+    userSession: {
+      update: mocks.userSessionUpdate
+    }
+  }
+}));
+
 import { POST } from "./route";
 
 describe("POST /api/auth/logout", () => {
@@ -39,8 +48,10 @@ describe("POST /api/auth/logout", () => {
       userId: "u1",
       organizationId: "org1",
       role: "ADMIN",
-      email: "andrew@qa.org"
+      email: "andrew@qa.org",
+      sessionId: "sess1"
     });
+    mocks.userSessionUpdate.mockResolvedValue({ id: "sess1" });
 
     const response = await POST(new Request("http://localhost/api/auth/logout", { method: "POST" }));
     expect(response.status).toBe(200);
@@ -61,8 +72,10 @@ describe("POST /api/auth/logout", () => {
       userId: "u1",
       organizationId: "org1",
       role: "ADMIN",
-      email: "andrew@qa.org"
+      email: "andrew@qa.org",
+      sessionId: "sess1"
     });
+    mocks.userSessionUpdate.mockResolvedValue({ id: "sess1" });
 
     const response = await POST(new Request("http://localhost/api/auth/logout", { method: "POST" }));
     expect(response.status).toBe(200);

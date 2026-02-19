@@ -29,6 +29,12 @@ CREATE TABLE "User" (
   "passwordHash" TEXT NOT NULL,
   "fullName" TEXT NOT NULL,
   "role" TEXT NOT NULL,
+  "userStatus" TEXT NOT NULL DEFAULT 'ACTIVE',
+  "mfaEnabled" BOOLEAN NOT NULL DEFAULT false,
+  "lastLoginAt" DATETIME,
+  "failedLoginAttempts" INTEGER NOT NULL DEFAULT 0,
+  "lockedAt" DATETIME,
+  "passwordUpdatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "User_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
@@ -360,3 +366,21 @@ CREATE TABLE "ElectronicSignature" (
 );
 CREATE INDEX "ElectronicSignature_organizationId_recordType_recordId_recordVersionId_idx" ON "ElectronicSignature"("organizationId", "recordType", "recordId", "recordVersionId");
 CREATE INDEX "ElectronicSignature_organizationId_signedAt_idx" ON "ElectronicSignature"("organizationId", "signedAt");
+
+
+CREATE TABLE "UserSession" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "organizationId" TEXT NOT NULL,
+  "userId" TEXT NOT NULL,
+  "lastActivityAt" DATETIME NOT NULL,
+  "idleTimeoutSeconds" INTEGER NOT NULL DEFAULT 1800,
+  "expiresAt" DATETIME NOT NULL,
+  "revokedAt" DATETIME,
+  "ip" TEXT,
+  "userAgent" TEXT,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "UserSession_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "UserSession_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE INDEX "UserSession_organizationId_userId_createdAt_idx" ON "UserSession"("organizationId", "userId", "createdAt");
+CREATE INDEX "UserSession_organizationId_revokedAt_expiresAt_idx" ON "UserSession"("organizationId", "revokedAt", "expiresAt");

@@ -3,7 +3,8 @@ import { ApiError } from "@/server/api/http";
 
 const mocks = vi.hoisted(() => ({
   getSessionOrThrow: vi.fn(),
-  createDocumentVersion: vi.fn()
+  createDocumentVersion: vi.fn(),
+  listDocumentVersionHistory: vi.fn()
 }));
 
 vi.mock("@/server/api/http", async () => {
@@ -15,10 +16,11 @@ vi.mock("@/server/api/http", async () => {
 });
 
 vi.mock("@/server/documents/lifecycle", () => ({
-  createDocumentVersion: mocks.createDocumentVersion
+  createDocumentVersion: mocks.createDocumentVersion,
+  listDocumentVersionHistory: mocks.listDocumentVersionHistory
 }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 describe("POST /api/documents/:id/versions", () => {
   beforeEach(() => {
@@ -29,6 +31,18 @@ describe("POST /api/documents/:id/versions", () => {
       role: "ENGINEER"
     });
     mocks.createDocumentVersion.mockResolvedValue({ id: "v3", versionNumber: 3, state: "DRAFT" });
+    mocks.listDocumentVersionHistory.mockResolvedValue([
+      {
+        id: "v3",
+        versionNumber: 3,
+        state: "DRAFT",
+        changeReason: "Correction: fixed requirement statement",
+        changeComment: "Correction",
+        createdAt: "2026-02-19T00:00:00.000Z",
+        editedBy: { id: "u1", fullName: "Andrew", email: "andrew@qa.org" },
+        signatures: []
+      }
+    ]);
   });
 
   it("requires change_reason", async () => {
@@ -97,5 +111,39 @@ describe("POST /api/documents/:id/versions", () => {
         createdAt: "1999-01-01T00:00:00.000Z"
       })
     );
+  });
+});
+
+
+describe("GET /api/documents/:id/versions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getSessionOrThrow.mockResolvedValue({
+      userId: "u1",
+      organizationId: "org1",
+      role: "ENGINEER"
+    });
+    mocks.listDocumentVersionHistory.mockResolvedValue([
+      {
+        id: "v1",
+        versionNumber: 1,
+        state: "APPROVED",
+        changeReason: "Initial approval",
+        changeComment: "Baseline",
+        createdAt: "2026-02-19T00:00:00.000Z",
+        editedBy: { id: "u1", fullName: "Andrew", email: "andrew@qa.org" },
+        signatures: [
+          { id: "sig1", signerFullName: "Reviewer One", meaning: "APPROVE", signedAt: "2026-02-19T01:00:00.000Z" }
+        ]
+      }
+    ]);
+  });
+
+  it("returns version history with change reasons and signatures", async () => {
+    const response = await GET(new Request("http://localhost"), { params: Promise.resolve({ id: "doc1" }) });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body[0].changeReason).toBe("Initial approval");
+    expect(body[0].signatures[0].meaning).toBe("APPROVE");
   });
 });

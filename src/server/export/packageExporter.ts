@@ -204,13 +204,15 @@ export const exportDocumentAsPdfWithMetadata = async (params: {
     stream.on("error", (error) => reject(error));
   });
 
+  const exportedFileHash = createHash("sha256").update(await fs.promises.readFile(pdfPath)).digest("hex");
+
   if (params.createdByUserId) {
     await prisma.documentExport.create({
       data: {
         exportId: randomUUID(),
         organizationId: params.organizationId,
         docId: document.id,
-        hash,
+        hash: exportedFileHash,
         path: pdfPath,
         format: "pdf",
         createdBy: params.createdByUserId
@@ -295,6 +297,7 @@ export const exportDocumentAsDocxWithMetadata = async (params: {
   });
   const docxPath = path.join(outputDir, `${randomUUID()}.docx`);
   await fs.promises.writeFile(docxPath, rendered.buffer);
+  const exportedFileHash = createHash("sha256").update(rendered.buffer).digest("hex");
 
   if (params.createdByUserId) {
     await prisma.documentExport.create({
@@ -302,7 +305,7 @@ export const exportDocumentAsDocxWithMetadata = async (params: {
         exportId: randomUUID(),
         organizationId: params.organizationId,
         docId: document.id,
-        hash,
+        hash: exportedFileHash,
         path: docxPath,
         format: "docx",
         createdBy: params.createdByUserId

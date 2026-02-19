@@ -14,7 +14,8 @@ export async function GET(_request: Request, context: { params: Promise<{ machin
         },
         stage: {
           in: ["PRE_EXECUTION", "EXECUTION"]
-        }
+        },
+        deletedAt: null
       },
       orderBy: { createdAt: "desc" }
     });

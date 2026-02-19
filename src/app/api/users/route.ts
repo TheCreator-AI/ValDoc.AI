@@ -13,6 +13,8 @@ export async function GET() {
         fullName: true,
         role: true,
         userStatus: true,
+        failedLoginAttempts: true,
+        lockedAt: true,
         mfaEnabled: true,
         lastLoginAt: true,
         createdAt: true

@@ -10,6 +10,7 @@ export async function GET() {
       include: {
         machine: true,
         documents: {
+          where: { deletedAt: null },
           include: {
             versions: {
               orderBy: { versionNumber: "desc" },

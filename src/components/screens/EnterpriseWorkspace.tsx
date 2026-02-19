@@ -84,6 +84,33 @@ type UploadedSourceDocument = {
   uploadedAt: string;
 };
 
+
+type DocumentVersionSignature = {
+  id: string;
+  signerUserId: string;
+  signerFullName: string;
+  meaning: "AUTHOR" | "REVIEW" | "APPROVE";
+  signedAt: string;
+  remarks?: string | null;
+  signatureManifest: string;
+};
+
+type DocumentVersionHistoryItem = {
+  id: string;
+  versionNumber: number;
+  state: "DRAFT" | "IN_REVIEW" | "APPROVED" | "OBSOLETE";
+  changeReason?: string | null;
+  changeComment?: string | null;
+  contentHash?: string | null;
+  createdAt: string;
+  editedBy?: {
+    id: string;
+    fullName: string;
+    email: string;
+  } | null;
+  signatures: DocumentVersionSignature[];
+};
+
 type QualityIssue = {
   code: string;
   message: string;
@@ -121,6 +148,15 @@ type SystemTimeStatus = {
 type LoginOrganization = {
   id: string;
   name: string;
+};
+
+type ApiClientError = Error & {
+  issues?: QualityIssue[];
+  attemptsRemaining?: number;
+  lockoutThreshold?: number;
+  locked?: boolean;
+  passwordExpired?: boolean;
+  mfaRequired?: boolean;
 };
 
 const sourceTypes = ["MANUAL", "DATASHEET", "DRAWING", "SOP", "CLIENT_CRITERIA", "SITE_STANDARD", "TEMPLATE"];
@@ -215,11 +251,28 @@ const defaultTemplates: Record<DocTemplateType, { title: string; content: string
 const callApi = async <T,>(url: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(url, init);
   if (!response.ok) {
-    const error = (await response.json().catch(() => ({}))) as { error?: string; issues?: QualityIssue[] };
-    const apiError = new Error(error.error ?? `HTTP ${response.status}`) as Error & { issues?: QualityIssue[] };
+    const error = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      issues?: QualityIssue[];
+      attemptsRemaining?: number;
+      lockoutThreshold?: number;
+      locked?: boolean;
+      passwordExpired?: boolean;
+      mfaRequired?: boolean;
+    };
+    const apiError = new Error(error.error ?? `HTTP ${response.status}`) as ApiClientError;
     if (Array.isArray(error.issues)) {
       apiError.issues = error.issues;
     }
+    if (typeof error.attemptsRemaining === "number") {
+      apiError.attemptsRemaining = error.attemptsRemaining;
+    }
+    if (typeof error.lockoutThreshold === "number") {
+      apiError.lockoutThreshold = error.lockoutThreshold;
+    }
+    apiError.locked = error.locked;
+    apiError.passwordExpired = error.passwordExpired;
+    apiError.mfaRequired = error.mfaRequired;
     throw apiError;
   }
   return (await response.json()) as T;
@@ -291,6 +344,7 @@ export default function EnterpriseWorkspace() {
   const [dragOver, setDragOver] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [loginAttemptsRemaining, setLoginAttemptsRemaining] = useState<number | null>(null);
   const [sourceType, setSourceType] = useState("MANUAL");
   const [executedIoqUnitId, setExecutedIoqUnitId] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -593,6 +647,7 @@ export default function EnterpriseWorkspace() {
     }
     setLoading(true);
     setMessage("");
+    setLoginAttemptsRemaining(null);
 
     try {
       await callApi<{ user: SessionUser }>("/api/auth/login", {
@@ -606,9 +661,17 @@ export default function EnterpriseWorkspace() {
       setSelectedLoginOrganizationId(session.organization.id);
       await refreshData();
       setMessage("Login successful.");
+      setLoginAttemptsRemaining(null);
     } catch (error) {
-      const messageText = error instanceof Error ? error.message : "Login failed.";
+      const apiError = error as ApiClientError;
+      const messageText = apiError instanceof Error ? apiError.message : "Login failed.";
       setMessage(messageText);
+      const attempts = typeof apiError.attemptsRemaining === "number" ? apiError.attemptsRemaining : null;
+      if (attempts !== null && attempts > 0 && attempts <= 3) {
+        setLoginAttemptsRemaining(attempts);
+      } else {
+        setLoginAttemptsRemaining(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -1133,6 +1196,21 @@ const deleteTemplate = async (templateId: string) => {
     }
   };
 
+
+  const softDeleteDocument = async (documentId: string, reason: string) => {
+    try {
+      await callApi(`/api/documents/${documentId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: reason.trim() })
+      });
+      await refreshData();
+      setMessage("Document soft-deleted with reason.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Failed to soft-delete document.");
+    }
+  };
+
   const transitionVersionState = async (
     documentId: string,
     versionId: string,
@@ -1260,6 +1338,11 @@ const deleteTemplate = async (templateId: string) => {
           <button className="authButton" onClick={login} disabled={loading}>
             {loading ? "Signing in..." : "Sign in"}
           </button>
+          {loginAttemptsRemaining !== null ? (
+            <p className="statusFailed" style={{ fontSize: "0.85rem" }}>
+              Warning: {loginAttemptsRemaining} login {loginAttemptsRemaining === 1 ? "attempt" : "attempts"} remaining before lockout.
+            </p>
+          ) : null}
           <p>{message}</p>
         </section>
       </main>
@@ -1911,6 +1994,7 @@ const deleteTemplate = async (templateId: string) => {
                     onDecision={decide}
                     onTransition={transitionVersionState}
                     onSign={signRecordVersion}
+                    onSoftDelete={softDeleteDocument}
                     jobId={selectedJob.id}
                     userRole={user.role}
                     isSigning={signingDocumentId === document.id}
@@ -1927,6 +2011,7 @@ const deleteTemplate = async (templateId: string) => {
                     onDecision={decide}
                     onTransition={transitionVersionState}
                     onSign={signRecordVersion}
+                    onSoftDelete={softDeleteDocument}
                     jobId={selectedJob.id}
                     userRole={user.role}
                     isSigning={signingDocumentId === document.id}
@@ -2133,6 +2218,7 @@ function DocumentCard(props: {
     emergencyOverride?: boolean;
     overrideJustification?: string;
   }) => Promise<void>;
+  onSoftDelete: (documentId: string, reason: string) => Promise<void>;
   jobId: string;
   userRole: SessionUser["role"];
   isSigning: boolean;
@@ -2150,6 +2236,22 @@ function DocumentCard(props: {
   const [transitionOverrideJustification, setTransitionOverrideJustification] = useState("");
   const [signEmergencyOverride, setSignEmergencyOverride] = useState(false);
   const [signOverrideJustification, setSignOverrideJustification] = useState("");
+  const [historyItems, setHistoryItems] = useState<DocumentVersionHistoryItem[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [deleteReason, setDeleteReason] = useState("Correction superseded by controlled update");
+
+  const loadHistory = async () => {
+    if (historyLoading) return;
+    setHistoryLoading(true);
+    try {
+      const history = await callApi<DocumentVersionHistoryItem[]>(`/api/documents/${props.document.id}/versions`);
+      setHistoryItems(history);
+      setHistoryLoaded(true);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   return (
     <div className="docCard">
@@ -2157,6 +2259,38 @@ function DocumentCard(props: {
       <p>{props.document.title}</p>
       <p>Latest Version: {props.document.latestVersionNumber ?? "N/A"}</p>
       <p>Lifecycle State: {props.document.latestVersionState ?? "N/A"}</p>
+      <button onClick={() => loadHistory().catch(() => undefined)}>
+        {historyLoading ? "Loading History..." : historyLoaded ? "Refresh History" : "Load Version History"}
+      </button>
+      {historyLoaded ? (
+        <div className="docCard" style={{ marginTop: "8px" }}>
+          <p><strong>Current and Prior Versions</strong></p>
+          {historyItems.length === 0 ? (
+            <p>No version history found.</p>
+          ) : (
+            historyItems.map((item, index) => (
+              <div key={item.id} style={{ borderTop: index === 0 ? "none" : "1px solid #e5e7eb", paddingTop: index === 0 ? 0 : 8, marginTop: index === 0 ? 0 : 8 }}>
+                <p><strong>{index === 0 ? "Current" : "Prior"} v{item.versionNumber}</strong> - {item.state}</p>
+                <p>Changed by: {item.editedBy?.fullName ?? "Unknown"} ({item.editedBy?.email ?? "n/a"})</p>
+                <p>When: {item.createdAt}</p>
+                <p>Reason: {item.changeReason ?? item.changeComment ?? "Not provided"}</p>
+                {item.signatures.length > 0 ? (
+                  <>
+                    <p><strong>Signatures</strong></p>
+                    {item.signatures.map((sig) => (
+                      <p key={sig.id}>
+                        {sig.meaning} by {sig.signerFullName} at {sig.signedAt}
+                      </p>
+                    ))}
+                  </>
+                ) : (
+                  <p>Signatures: none</p>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      ) : null}
       <input
         value={changeReason}
         onChange={(event) => setChangeReason(event.target.value)}
@@ -2294,6 +2428,19 @@ function DocumentCard(props: {
       <div className="row">
         <a href={`/api/export/${props.jobId}?format=docx&documentId=${props.document.id}`} target="_blank">DOCX</a>
         <a href={`/api/export/${props.jobId}?format=pdf&documentId=${props.document.id}`} target="_blank">PDF</a>
+      </div>
+      <div className="row">
+        <input
+          value={deleteReason}
+          onChange={(event) => setDeleteReason(event.target.value)}
+          placeholder="Soft-delete reason (required)"
+        />
+        <button
+          onClick={() => props.onSoftDelete(props.document.id, deleteReason)}
+          disabled={!deleteReason.trim()}
+        >
+          Soft Delete Record
+        </button>
       </div>
     </div>
   );

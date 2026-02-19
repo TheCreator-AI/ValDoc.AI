@@ -6,10 +6,25 @@ import { apiJson } from "@/server/api/http";
 import { ensureDatabaseInitialized } from "@/server/db/bootstrap";
 import { writeAuditEvent } from "@/server/audit/events";
 import { isSystemOwnerEmail } from "@/server/auth/systemOwner";
+import { getAuthPolicy } from "@/server/auth/policy";
+
+const getClientIp = (request: Request) => {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (!forwarded) return null;
+  const first = forwarded.split(",")[0]?.trim();
+  return first || null;
+};
+
+const isPasswordExpired = (passwordUpdatedAt: Date | null, maxAgeDays: number) => {
+  const updatedAt = passwordUpdatedAt ?? new Date(0);
+  const ageMs = Date.now() - updatedAt.getTime();
+  return ageMs > maxAgeDays * 24 * 60 * 60 * 1000;
+};
 
 export async function POST(request: Request) {
   await ensureDatabaseInitialized();
   const body = (await request.json()) as { organizationId?: string; email?: string; password?: string };
+  const authPolicy = getAuthPolicy();
 
   if (!body.organizationId || !body.email || !body.password) {
     return apiJson(400, { error: "Organization, email, and password are required." });
@@ -28,36 +43,6 @@ export async function POST(request: Request) {
     return apiJson(404, { error: "Selected organization was not found or is inactive." });
   }
 
-
-  if (user.userStatus === "LOCKED") {
-    await writeAuditEvent({
-      organizationId: body.organizationId,
-      actorUserId: user.id,
-      action: "auth.login.failed",
-      entityType: "User",
-      entityId: user.id,
-      outcome: "DENIED",
-      details: { reason: "user_locked", email: user.email },
-      request
-    }).catch(() => undefined);
-    return apiJson(403, { error: "Account is locked. Contact an administrator." });
-  }
-
-  const valid = await compare(body.password, user.passwordHash);
-  if (!valid) {
-    await writeAuditEvent({
-      organizationId: user.organizationId,
-      actorUserId: user.id,
-      action: "auth.login.failed",
-      entityType: "User",
-      entityId: user.id,
-      outcome: "DENIED",
-      details: { reason: "invalid_password", email: user.email },
-      request
-    }).catch(() => undefined);
-    return apiJson(401, { error: "Invalid credentials." });
-  }
-
   const isMasterAdmin = user.role === "ADMIN" && isSystemOwnerEmail(user.email);
   if (!isMasterAdmin && user.organizationId !== body.organizationId) {
     await writeAuditEvent({
@@ -73,12 +58,147 @@ export async function POST(request: Request) {
     return apiJson(403, { error: "User does not belong to the selected organization." });
   }
 
+  if (user.userStatus === "LOCKED") {
+    await writeAuditEvent({
+      organizationId: body.organizationId,
+      actorUserId: user.id,
+      action: "auth.login.failed",
+      entityType: "User",
+      entityId: user.id,
+      outcome: "DENIED",
+      details: { reason: "user_locked", email: user.email },
+      request
+    }).catch(() => undefined);
+    return apiJson(423, {
+      error: "Account is locked. Contact an administrator to unlock.",
+      locked: true,
+      attemptsRemaining: 0,
+      lockoutThreshold: authPolicy.lockoutThreshold
+    });
+  }
+
+  if (isPasswordExpired(user.passwordUpdatedAt ?? user.createdAt, authPolicy.passwordMaxAgeDays)) {
+    await writeAuditEvent({
+      organizationId: body.organizationId,
+      actorUserId: user.id,
+      action: "auth.login.failed",
+      entityType: "User",
+      entityId: user.id,
+      outcome: "DENIED",
+      details: { reason: "password_expired", email: user.email, passwordMaxAgeDays: authPolicy.passwordMaxAgeDays },
+      request
+    }).catch(() => undefined);
+    return apiJson(403, {
+      error: "Password expired. Reset your password before signing in.",
+      passwordExpired: true,
+      passwordMaxAgeDays: authPolicy.passwordMaxAgeDays
+    });
+  }
+
+  if (authPolicy.requireAdminMfa && user.role === "ADMIN" && !user.mfaEnabled) {
+    await writeAuditEvent({
+      organizationId: body.organizationId,
+      actorUserId: user.id,
+      action: "auth.login.failed",
+      entityType: "User",
+      entityId: user.id,
+      outcome: "DENIED",
+      details: { reason: "admin_mfa_required", email: user.email },
+      request
+    }).catch(() => undefined);
+    return apiJson(403, {
+      error: "Admin MFA is required for this deployment.",
+      mfaRequired: true
+    });
+  }
+
+  const valid = await compare(body.password, user.passwordHash);
+  if (!valid) {
+    const nextFailedAttempts = (user.failedLoginAttempts ?? 0) + 1;
+    const attemptsRemaining = Math.max(0, authPolicy.lockoutThreshold - nextFailedAttempts);
+    const isLocking = nextFailedAttempts >= authPolicy.lockoutThreshold;
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: nextFailedAttempts,
+        ...(isLocking ? { userStatus: "LOCKED", lockedAt: new Date() } : {})
+      }
+    }).catch(() => undefined);
+
+    await writeAuditEvent({
+      organizationId: body.organizationId,
+      actorUserId: user.id,
+      action: "auth.login.failed",
+      entityType: "User",
+      entityId: user.id,
+      outcome: "DENIED",
+      details: {
+        reason: "invalid_password",
+        email: user.email,
+        failedLoginAttempts: nextFailedAttempts,
+        attemptsRemaining,
+        lockoutThreshold: authPolicy.lockoutThreshold
+      },
+      request
+    }).catch(() => undefined);
+
+    if (isLocking) {
+      await writeAuditEvent({
+        organizationId: body.organizationId,
+        actorUserId: user.id,
+        action: "auth.lockout",
+        entityType: "User",
+        entityId: user.id,
+        outcome: "SUCCESS",
+        details: { email: user.email, failedLoginAttempts: nextFailedAttempts, lockoutThreshold: authPolicy.lockoutThreshold },
+        request
+      }).catch(() => undefined);
+      return apiJson(423, {
+        error: "Account locked after too many failed attempts. Contact an administrator.",
+        locked: true,
+        attemptsRemaining: 0,
+        lockoutThreshold: authPolicy.lockoutThreshold
+      });
+    }
+
+    return apiJson(401, {
+      error: "Invalid credentials.",
+      attemptsRemaining,
+      lockoutThreshold: authPolicy.lockoutThreshold
+    });
+  }
+
+  const now = new Date();
+  const session = await prisma.userSession.create({
+    data: {
+      organizationId: body.organizationId,
+      userId: user.id,
+      expiresAt: new Date(now.getTime() + authPolicy.sessionMaxAgeSeconds * 1000),
+      lastActivityAt: now,
+      idleTimeoutSeconds: authPolicy.idleTimeoutSeconds,
+      ip: getClientIp(request),
+      userAgent: request.headers.get("user-agent")
+    },
+    select: { id: true }
+  });
+
   const token = await signSessionToken({
     userId: user.id,
     organizationId: body.organizationId,
     role: user.role,
-    email: user.email
+    email: user.email,
+    sessionId: session.id
   });
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      lastLoginAt: now,
+      failedLoginAttempts: 0,
+      lockedAt: null
+    }
+  }).catch(() => undefined);
 
   await writeAuditEvent({
     organizationId: body.organizationId,
@@ -86,22 +206,9 @@ export async function POST(request: Request) {
     action: "auth.login.success",
     entityType: "User",
     entityId: user.id,
-      details: { email: user.email },
-      request
+    details: { email: user.email, sessionId: session.id },
+    request
   }).catch(() => undefined);
-
-  const prismaWithOptionalUpdate = prisma as typeof prisma & {
-    user: typeof prisma.user & {
-      update?: (args: { where: { id: string }; data: { lastLoginAt: Date } }) => Promise<unknown>;
-    };
-  };
-
-  if (typeof prismaWithOptionalUpdate.user.update === "function") {
-    await prismaWithOptionalUpdate.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() }
-    }).catch(() => undefined);
-  }
 
   return new Response(
     JSON.stringify({
@@ -117,10 +224,7 @@ export async function POST(request: Request) {
       status: 200,
       headers: {
         "Content-Type": "application/json",
-        "Set-Cookie": buildSessionCookieHeader({
-          token,
-          maxAgeSeconds: 28800
-        })
+        "Set-Cookie": buildSessionCookieHeader({ token, maxAgeSeconds: authPolicy.sessionMaxAgeSeconds })
       }
     }
   );

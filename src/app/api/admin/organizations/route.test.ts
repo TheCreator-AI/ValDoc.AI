@@ -7,7 +7,8 @@ const mocks = vi.hoisted(() => ({
   createOrg: vi.fn(),
   createUser: vi.fn(),
   writeAuditEvent: vi.fn(),
-  hashPassword: vi.fn()
+  hashPassword: vi.fn(),
+  getPasswordPolicyErrors: vi.fn()
 }));
 
 vi.mock("@/server/api/http", async () => {
@@ -40,7 +41,8 @@ vi.mock("@/server/db/prisma", () => ({
 }));
 
 vi.mock("@/server/auth/password", () => ({
-  hashPassword: mocks.hashPassword
+  hashPassword: mocks.hashPassword,
+  getPasswordPolicyErrors: mocks.getPasswordPolicyErrors
 }));
 
 vi.mock("@/server/audit/events", () => ({
@@ -60,6 +62,7 @@ describe("admin organizations route", () => {
     });
     mocks.assertSystemOwnerOrThrow.mockReturnValue(undefined);
     mocks.writeAuditEvent.mockResolvedValue(undefined);
+    mocks.getPasswordPolicyErrors.mockReturnValue([]);
   });
 
   it("lists organizations for system owner", async () => {

@@ -1,10 +1,10 @@
-import { hash } from "bcryptjs";
 import { prisma } from "@/server/db/prisma";
 import { apiJson } from "@/server/api/http";
 import { writeAuditEvent } from "@/server/audit/events";
 import { ensureDatabaseInitialized } from "@/server/db/bootstrap";
 import { getRequiredEnv } from "@/server/config/env";
 import { provisionDeployment } from "@/server/setup/provision";
+import { getPasswordPolicyErrors, hashPassword } from "@/server/auth/password";
 
 export async function POST(request: Request) {
   const env = getRequiredEnv();
@@ -25,7 +25,12 @@ export async function POST(request: Request) {
     return apiJson(400, { error: "organizationName, adminEmail, adminFullName, and adminPassword are required." });
   }
 
-  const passwordHash = await hash(body.adminPassword, 10);
+  const passwordPolicyErrors = getPasswordPolicyErrors(body.adminPassword);
+  if (passwordPolicyErrors.length > 0) {
+    return apiJson(400, { error: passwordPolicyErrors[0], issues: passwordPolicyErrors });
+  }
+
+  const passwordHash = await hashPassword(body.adminPassword);
   const provisioned = await provisionDeployment(
     {
       customerId: env.CUSTOMER_ID,

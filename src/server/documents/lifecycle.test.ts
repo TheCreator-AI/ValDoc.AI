@@ -3,9 +3,13 @@ import { ApiError } from "@/server/api/http";
 
 const mocks = vi.hoisted(() => ({
   versionFindFirst: vi.fn(),
+  versionFindMany: vi.fn(),
   versionCreate: vi.fn(),
   versionUpdate: vi.fn(),
+  generatedFindFirst: vi.fn(),
   generatedUpdate: vi.fn(),
+  generatedDelete: vi.fn(),
+  signatureFindMany: vi.fn(),
   writeAuditEvent: vi.fn()
 }));
 
@@ -13,11 +17,17 @@ vi.mock("@/server/db/prisma", () => ({
   prisma: {
     documentVersion: {
       findFirst: mocks.versionFindFirst,
+      findMany: mocks.versionFindMany,
       create: mocks.versionCreate,
       update: mocks.versionUpdate
     },
     generatedDocument: {
-      update: mocks.generatedUpdate
+      findFirst: mocks.generatedFindFirst,
+      update: mocks.generatedUpdate,
+      delete: mocks.generatedDelete
+    },
+    electronicSignature: {
+      findMany: mocks.signatureFindMany
     }
   }
 }));
@@ -26,7 +36,7 @@ vi.mock("@/server/audit/events", () => ({
   writeAuditEvent: mocks.writeAuditEvent
 }));
 
-import { createDocumentVersion, transitionDocumentVersionState } from "@/server/documents/lifecycle";
+import { createDocumentVersion, listDocumentVersionHistory, softDeleteRegulatedDocument, transitionDocumentVersionState } from "@/server/documents/lifecycle";
 
 describe("document lifecycle service", () => {
   const originalEnforceTwoPersonRule = process.env.ENFORCE_TWO_PERSON_RULE;
@@ -46,7 +56,10 @@ describe("document lifecycle service", () => {
     });
     mocks.versionCreate.mockResolvedValue({ id: "v3", versionNumber: 3, state: "DRAFT" });
     mocks.versionUpdate.mockResolvedValue({ id: "v2", state: "IN_REVIEW" });
+    mocks.versionFindMany.mockResolvedValue([]);
+    mocks.generatedFindFirst.mockResolvedValue({ id: "d1", deletedAt: null, status: "DRAFT" });
     mocks.generatedUpdate.mockResolvedValue({});
+    mocks.signatureFindMany.mockResolvedValue([]);
     mocks.writeAuditEvent.mockResolvedValue(undefined);
   });
 
@@ -207,4 +220,62 @@ describe("document lifecycle service", () => {
       expect.objectContaining({ action: "document.version.transition.override" })
     );
   });
+});
+
+
+it("soft-deletes regulated document without hard delete", async () => {
+  mocks.generatedFindFirst.mockResolvedValueOnce({
+    id: "d1",
+    deletedAt: null,
+    status: "IN_REVIEW"
+  });
+  mocks.generatedUpdate.mockResolvedValueOnce({
+    id: "d1",
+    deletedAt: new Date("2026-02-19T00:00:00.000Z"),
+    status: "REJECTED"
+  });
+
+  await softDeleteRegulatedDocument({
+    organizationId: "org1",
+    documentId: "d1",
+    actorUserId: "u1",
+    reason: "Correction superseded by new approved version"
+  });
+
+  expect(mocks.generatedUpdate).toHaveBeenCalledWith(
+    expect.objectContaining({ where: { id: "d1" }, data: expect.objectContaining({ deletedAt: expect.any(Date) }) })
+  );
+  expect(mocks.generatedDelete).not.toHaveBeenCalled();
+  expect(mocks.writeAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: "document.soft_delete" }));
+});
+
+it("returns version history with signatures", async () => {
+  mocks.versionFindMany.mockResolvedValueOnce([
+    {
+      id: "v2",
+      versionNumber: 2,
+      state: "APPROVED",
+      changeReason: "Correction applied",
+      changeComment: "Correction",
+      contentHash: "hash-v2",
+      createdAt: new Date("2026-02-19T00:00:00.000Z"),
+      editedBy: { id: "u1", fullName: "Andrew", email: "andrew@qa.org" }
+    }
+  ]);
+  mocks.signatureFindMany.mockResolvedValueOnce([
+    {
+      id: "sig1",
+      recordVersionId: "v2",
+      signerUserId: "u2",
+      signerFullName: "Reviewer",
+      meaning: "APPROVE",
+      signedAt: new Date("2026-02-19T01:00:00.000Z"),
+      remarks: null,
+      signatureManifest: "abc"
+    }
+  ]);
+
+  const history = await listDocumentVersionHistory({ organizationId: "org1", documentId: "d1" });
+  expect(history[0].changeReason).toBe("Correction applied");
+  expect(history[0].signatures[0].id).toBe("sig1");
 });

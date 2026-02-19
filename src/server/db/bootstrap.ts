@@ -203,6 +203,22 @@ export const ensureDatabaseInitialized = async () => {
     )
   `);
   await prismaWithRaw.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS \"AccessReviewReport_organizationId_createdAt_idx\" ON \"AccessReviewReport\"(\"organizationId\", \"createdAt\")");
+  await prismaWithRaw.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "UserSession" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "organizationId" TEXT NOT NULL,
+      "userId" TEXT NOT NULL,
+      "lastActivityAt" DATETIME NOT NULL,
+      "idleTimeoutSeconds" INTEGER NOT NULL DEFAULT 1800,
+      "expiresAt" DATETIME NOT NULL,
+      "revokedAt" DATETIME,
+      "ip" TEXT,
+      "userAgent" TEXT,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await prismaWithRaw.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS \"UserSession_organizationId_userId_createdAt_idx\" ON \"UserSession\"(\"organizationId\", \"userId\", \"createdAt\")");
+  await prismaWithRaw.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS \"UserSession_organizationId_revokedAt_expiresAt_idx\" ON \"UserSession\"(\"organizationId\", \"revokedAt\", \"expiresAt\")");
   await prismaWithRaw.$executeRawUnsafe("UPDATE \"DocumentTemplate\" SET \"templateId\" = \"id\" WHERE \"templateId\" IS NULL OR trim(\"templateId\") = ''");
   await prismaWithRaw.$executeRawUnsafe("UPDATE \"DocumentTemplate\" SET \"status\" = CASE WHEN \"isPrimary\" = 1 THEN 'APPROVED' ELSE COALESCE(\"status\", 'DRAFT') END");
   await prismaWithRaw.$executeRawUnsafe("UPDATE \"DocumentTemplate\" SET \"approvedAt\" = COALESCE(\"approvedAt\", \"createdAt\") WHERE \"status\" = 'APPROVED'");

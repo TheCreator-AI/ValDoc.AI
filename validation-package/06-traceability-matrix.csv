@@ -1,0 +1,17 @@
+req_id,risk_id,test_id,control_reference,artifact_reference
+URS-SYS-001,RA-SYS-001,OQ-SEC-001,Server-side RBAC checks,src/server/api/http.ts
+URS-SYS-001,RA-SYS-001,OQ-SEC-002,Denied action audit logging,src/server/audit/events.ts
+URS-SYS-002,RA-SYS-002,OQ-SEC-003,Failed login tracking and lockout,src/app/api/auth/login/route.ts
+URS-SYS-002,RA-SYS-002,OQ-SEC-004,Session timeout enforcement,src/server/api/http.ts
+URS-SYS-003,RA-SYS-003,OQ-COMP-001,Append-only audit event model,src/server/audit/events.ts
+URS-SYS-003,RA-SYS-003,OQ-COMP-002,Audit hash chain verification,src/server/audit/chain.ts
+URS-SYS-004,RA-SYS-004,OQ-COMP-003,Password re-auth + signature hash linkage,src/app/api/records/[type]/[id]/versions/[versionId]/sign/route.ts
+URS-SYS-005,RA-SYS-005,OQ-FUNC-005,State machine enforcement,src/server/documents/lifecycle.ts
+URS-SYS-006,RA-SYS-005,OQ-FUNC-005,Approved version immutability,src/server/documents/lifecycle.ts
+URS-SYS-007,RA-SYS-006,OQ-COMP-004,Correction reason and field diff capture,src/server/audit/diff.ts
+URS-SYS-008,RA-SYS-006,OQ-COMP-004,Soft delete with reason + audit,src/server/documents/lifecycle.ts
+URS-SYS-009,RA-SYS-007,OQ-COMP-005,Document/export hash verification endpoints,src/server/integrity/verify.ts
+URS-SYS-010,RA-SYS-001,OQ-SEC-002,Authorized download responses with security headers,src/server/export/packageExporter.ts
+URS-SYS-011,RA-SYS-008,IQ-INFRA-004,Backup and restore integrity verification,src/server/backup/service.ts
+URS-SYS-011,RA-SYS-008,OQ-OPS-001,Backup restore test harness,src/server/backup/service.integration.test.ts
+URS-SYS-012,RA-SYS-009,OQ-SEC-006,Security gates in CI and local scripts,.github/workflows/ci.yml

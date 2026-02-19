@@ -21,6 +21,7 @@ export const createDocumentVersion = async (params: {
   actorUserId: string;
   changeReason: string;
   contentJson?: string;
+  correction?: boolean;
   request?: Request;
 }) => {
   const latest = await prisma.documentVersion.findFirst({
@@ -69,7 +70,8 @@ export const createDocumentVersion = async (params: {
       supersedesVersionId: latest.id,
       versionNumber: created.versionNumber,
       state: created.state,
-      changeReason: params.changeReason
+      changeReason: params.changeReason,
+      changeType: params.correction ? "CORRECTION" : "REVISION"
     },
     fieldChanges: diffJsonContent(latest.contentSnapshot, nextContent),
     request: params.request
@@ -202,6 +204,130 @@ export const transitionDocumentVersionState = async (params: {
         oldValue: version.state,
         newValue: params.toState
       }
+    ],
+    request: params.request
+  });
+
+  return updated;
+};
+
+
+export const listDocumentVersionHistory = async (params: {
+  organizationId: string;
+  documentId: string;
+}) => {
+  const versions = await prisma.documentVersion.findMany({
+    where: {
+      generatedDocumentId: params.documentId,
+      generatedDocument: { organizationId: params.organizationId }
+    },
+    include: {
+      editedBy: {
+        select: { id: true, fullName: true, email: true }
+      }
+    },
+    orderBy: { versionNumber: "desc" }
+  });
+
+  const versionIds = versions.map((item) => item.id);
+  const signatures = versionIds.length
+    ? await prisma.electronicSignature.findMany({
+        where: {
+          organizationId: params.organizationId,
+          recordType: "GENERATED_DOCUMENT",
+          recordId: params.documentId,
+          recordVersionId: { in: versionIds }
+        },
+        select: {
+          id: true,
+          recordVersionId: true,
+          signerUserId: true,
+          signerFullName: true,
+          meaning: true,
+          signedAt: true,
+          remarks: true,
+          signatureManifest: true
+        },
+        orderBy: { signedAt: "desc" }
+      })
+    : [];
+
+  const signaturesByVersion = signatures.reduce<Record<string, typeof signatures>>((acc, item) => {
+    if (!acc[item.recordVersionId]) {
+      acc[item.recordVersionId] = [];
+    }
+    acc[item.recordVersionId].push(item);
+    return acc;
+  }, {});
+
+  return versions.map((version) => ({
+    id: version.id,
+    versionNumber: version.versionNumber,
+    state: version.state,
+    changeReason: version.changeReason,
+    changeComment: version.changeComment,
+    contentHash: version.contentHash,
+    createdAt: version.createdAt,
+    editedBy: version.editedBy,
+    signatures: signaturesByVersion[version.id] ?? []
+  }));
+};
+
+export const softDeleteRegulatedDocument = async (params: {
+  organizationId: string;
+  documentId: string;
+  actorUserId: string;
+  reason: string;
+  request?: Request;
+}) => {
+  const existing = await prisma.generatedDocument.findFirst({
+    where: {
+      id: params.documentId,
+      organizationId: params.organizationId
+    },
+    select: {
+      id: true,
+      deletedAt: true,
+      status: true
+    }
+  });
+
+  if (!existing) {
+    throw new ApiError(404, "Document not found.");
+  }
+
+  if (existing.deletedAt) {
+    throw new ApiError(409, "Document is already soft-deleted.");
+  }
+
+  const deletedAt = new Date();
+  const updated = await prisma.generatedDocument.update({
+    where: { id: existing.id },
+    data: {
+      deletedAt,
+      status: "REJECTED"
+    },
+    select: {
+      id: true,
+      deletedAt: true,
+      status: true
+    }
+  });
+
+  await writeAuditEvent({
+    organizationId: params.organizationId,
+    actorUserId: params.actorUserId,
+    action: "document.soft_delete",
+    entityType: "GeneratedDocument",
+    entityId: existing.id,
+    details: {
+      reason: params.reason,
+      oldStatus: existing.status,
+      newStatus: updated.status
+    },
+    fieldChanges: [
+      { changePath: "deletedAt", oldValue: null, newValue: deletedAt.toISOString() },
+      { changePath: "status", oldValue: existing.status, newValue: updated.status }
     ],
     request: params.request
   });

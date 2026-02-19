@@ -1,17 +1,24 @@
 import { apiJson, getSessionOrThrow } from "@/server/api/http";
 import { writeAuditEvent } from "@/server/audit/events";
 import { buildSessionClearCookieHeader } from "@/server/auth/cookie";
+import { prisma } from "@/server/db/prisma";
 
 export async function POST(request: Request) {
   try {
     const session = await getSessionOrThrow();
+    if (session.sessionId) {
+      await prisma.userSession.update({
+        where: { id: session.sessionId },
+        data: { revokedAt: new Date() }
+      }).catch(() => undefined);
+    }
     await writeAuditEvent({
       organizationId: session.organizationId,
       actorUserId: session.userId,
       action: "auth.logout",
       entityType: "User",
       entityId: session.userId,
-      details: { email: session.email },
+      details: { email: session.email, sessionId: session.sessionId ?? null },
       request
     });
   } catch {

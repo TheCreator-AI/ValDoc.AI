@@ -1,5 +1,5 @@
 import { prisma } from "@/server/db/prisma";
-import { hashPassword } from "@/server/auth/password";
+import { getPasswordPolicyErrors, hashPassword } from "@/server/auth/password";
 import { ApiError, apiJson, getSessionOrThrow } from "@/server/api/http";
 import { assertSystemOwnerOrThrow } from "@/server/auth/systemOwner";
 import { writeAuditEvent } from "@/server/audit/events";
@@ -48,8 +48,9 @@ export async function POST(request: Request) {
     if (!name || !adminEmail || !adminFullName || !adminPassword) {
       return apiJson(400, { error: "Organization name and initial admin credentials are required." });
     }
-    if (adminPassword.length < 12) {
-      return apiJson(400, { error: "Initial admin password must be at least 12 characters." });
+    const passwordPolicyErrors = getPasswordPolicyErrors(adminPassword);
+    if (passwordPolicyErrors.length > 0) {
+      return apiJson(400, { error: passwordPolicyErrors[0], issues: passwordPolicyErrors });
     }
 
     const passwordHash = await hashPassword(adminPassword);

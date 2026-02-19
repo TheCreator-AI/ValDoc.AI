@@ -14,6 +14,23 @@ export class ApiError extends Error {
   }
 }
 
+const auditSessionFailure = async (params: {
+  organizationId: string;
+  actorUserId: string;
+  action: string;
+  sessionId?: string;
+}) => {
+  await writeAuditEvent({
+    organizationId: params.organizationId,
+    actorUserId: params.actorUserId,
+    action: params.action,
+    entityType: "UserSession",
+    entityId: params.sessionId ?? params.actorUserId,
+    outcome: "DENIED",
+    details: { sessionId: params.sessionId }
+  }).catch(() => undefined);
+};
+
 export const getSessionOrThrow = async (minimumRole?: Role) => {
   await ensureDatabaseInitialized();
   const cookieStore = await cookies();
@@ -31,6 +48,86 @@ export const getSessionOrThrow = async (minimumRole?: Role) => {
   if (!organization) {
     throw new ApiError(403, "Session organization is not active for this deployment.");
   }
+
+  if (!session.sessionId) {
+    throw new ApiError(401, "Session is invalid. Please sign in again.");
+  }
+
+  const userSession = await prisma.userSession.findFirst({
+    where: {
+      id: session.sessionId,
+      organizationId: session.organizationId,
+      userId: session.userId,
+      revokedAt: null
+    },
+    select: {
+      id: true,
+      expiresAt: true,
+      lastActivityAt: true,
+      idleTimeoutSeconds: true
+    }
+  });
+
+  if (!userSession) {
+    await auditSessionFailure({
+      organizationId: session.organizationId,
+      actorUserId: session.userId,
+      action: "auth.session.invalid",
+      sessionId: session.sessionId
+    });
+    throw new ApiError(401, "Session has ended. Please sign in again.");
+  }
+
+  const now = new Date();
+
+  if (userSession.expiresAt.getTime() <= now.getTime()) {
+    await prisma.userSession.update({
+      where: { id: userSession.id },
+      data: { revokedAt: now }
+    }).catch(() => undefined);
+    await auditSessionFailure({
+      organizationId: session.organizationId,
+      actorUserId: session.userId,
+      action: "auth.session.expired",
+      sessionId: session.sessionId
+    });
+    throw new ApiError(401, "Session expired. Please sign in again.");
+  }
+
+  const idleSeconds = Math.floor((now.getTime() - userSession.lastActivityAt.getTime()) / 1000);
+  if (idleSeconds > userSession.idleTimeoutSeconds) {
+    await prisma.userSession.update({
+      where: { id: userSession.id },
+      data: { revokedAt: now }
+    }).catch(() => undefined);
+    await auditSessionFailure({
+      organizationId: session.organizationId,
+      actorUserId: session.userId,
+      action: "auth.session.idle_timeout",
+      sessionId: session.sessionId
+    });
+    throw new ApiError(401, "Session timed out due to inactivity. Please sign in again.");
+  }
+
+  const account = await prisma.user.findFirst({
+    where: { id: session.userId, organizationId: session.organizationId },
+    select: { userStatus: true }
+  });
+  if (!account || account.userStatus === "LOCKED") {
+    await auditSessionFailure({
+      organizationId: session.organizationId,
+      actorUserId: session.userId,
+      action: "auth.session.locked",
+      sessionId: session.sessionId
+    });
+    throw new ApiError(403, "Account is locked.");
+  }
+
+  await prisma.userSession.update({
+    where: { id: userSession.id },
+    data: { lastActivityAt: now }
+  }).catch(() => undefined);
+
   if (minimumRole && !hasRole(session.role, minimumRole)) {
     await writeAuditEvent({
       organizationId: session.organizationId,

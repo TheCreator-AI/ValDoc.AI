@@ -123,6 +123,7 @@ model Organization {
   legalHolds LegalHold[]
   purgeRuns RetentionPurgeRun[]
   accessReviewReports AccessReviewReport[]
+  sessions UserSession[]
 }
 
 model DeploymentConfig {
@@ -150,8 +151,12 @@ model User {
   userStatus     UserAccountStatus @default(ACTIVE)
   mfaEnabled     Boolean       @default(false)
   lastLoginAt    DateTime?
+  failedLoginAttempts Int      @default(0)
+  lockedAt        DateTime?
+  passwordUpdatedAt DateTime   @default(now())
   createdAt      DateTime      @default(now())
   organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sessions       UserSession[]
   documentVersions DocumentVersion[]
   exports       DocumentExport[]     @relation("DocumentExportCreator")
   equipmentFacts EquipmentFact[]
@@ -581,4 +586,23 @@ model AccessReviewReport {
   generator           User          @relation("AccessReviewReportCreator", fields: [generatedByUserId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, createdAt])
+}
+
+
+model UserSession {
+  id                 String       @id @default(cuid())
+  organizationId     String
+  userId             String
+  lastActivityAt     DateTime
+  idleTimeoutSeconds Int          @default(1800)
+  expiresAt          DateTime
+  revokedAt          DateTime?
+  ip                 String?
+  userAgent          String?
+  createdAt          DateTime     @default(now())
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, userId, createdAt])
+  @@index([organizationId, revokedAt, expiresAt])
 }

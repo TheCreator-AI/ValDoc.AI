@@ -41,6 +41,8 @@ type UserRow = {
   fullName: string;
   role: "ADMIN" | "USER" | "APPROVER" | "REVIEWER" | "VIEWER";
   userStatus?: "ACTIVE" | "LOCKED";
+  failedLoginAttempts?: number;
+  lockedAt?: string | null;
   mfaEnabled?: boolean;
   lastLoginAt?: string | null;
   createdAt?: string;
@@ -182,6 +184,30 @@ export default function ExportConfigurationPage() {
     }
     setUsers((current) => current.map((user) => (user.id === userId ? { ...user, role: body.role } : user)));
     setMessage("User role updated.");
+  };
+
+  const unlockUser = async (userId: string) => {
+    const response = await fetch(`/api/users/${userId}/unlock`, {
+      method: "PATCH"
+    });
+    const body = await response.json();
+    if (!response.ok) {
+      setMessage(body.error ?? "Failed to unlock user.");
+      return;
+    }
+    setUsers((current) =>
+      current.map((user) =>
+        user.id === userId
+          ? {
+              ...user,
+              userStatus: body.userStatus,
+              failedLoginAttempts: body.failedLoginAttempts,
+              lockedAt: null
+            }
+          : user
+      )
+    );
+    setMessage("User unlocked.");
   };
 
   const generateAccessReviewReport = async () => {
@@ -392,7 +418,8 @@ export default function ExportConfigurationPage() {
             <p>Roles available: ADMIN, REVIEWER, APPROVER, USER.</p>
             {users.map((user) => (
               <p key={user.id}>
-                <strong>{user.fullName}</strong> ({user.email}){" "}
+                <strong>{user.fullName}</strong> ({user.email}) - {user.userStatus ?? "ACTIVE"}
+                {typeof user.failedLoginAttempts === "number" ? `, failed attempts: ${user.failedLoginAttempts}` : ""}{" "}
                 <select
                   value={user.role}
                   onChange={(event) => updateUserRole(user.id, event.target.value as UserRow["role"]).catch(() => setMessage("Failed to update user role."))}
@@ -402,6 +429,9 @@ export default function ExportConfigurationPage() {
                   <option value="APPROVER">APPROVER</option>
                   <option value="USER">USER</option>
                 </select>
+                {user.userStatus === "LOCKED" ? (
+                  <button onClick={() => unlockUser(user.id).catch(() => setMessage("Failed to unlock user."))}>Unlock</button>
+                ) : null}
               </p>
             ))}
             <hr />

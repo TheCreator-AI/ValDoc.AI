@@ -149,6 +149,8 @@ Optional local seeded demo user (if `npm run db:seed`):
 - `POST /api/review/{documentId}/decision`
 - `POST /api/documents/{id}/versions`
 - `POST /api/documents/{id}/versions/{versionId}/transition`
+- `GET /api/documents/{id}/versions/{versionId}/verify`
+- `GET /api/documents/{id}/exports/{exportId}/verify`
 - `GET /api/admin/audit/verify-chain`
 - `GET/POST /api/admin/organizations`
 - `DELETE /api/admin/organizations/{organizationId}`

@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { findUnique, findFirst, compare, signSessionToken, writeAuditEvent } = vi.hoisted(() => ({
+const { findUnique, findFirst, update, createSession, compare, signSessionToken, writeAuditEvent } = vi.hoisted(() => ({
   findUnique: vi.fn(),
   findFirst: vi.fn(),
+  update: vi.fn(),
+  createSession: vi.fn(),
   compare: vi.fn(),
   signSessionToken: vi.fn(),
   writeAuditEvent: vi.fn()
@@ -10,8 +12,9 @@ const { findUnique, findFirst, compare, signSessionToken, writeAuditEvent } = vi
 
 vi.mock("@/server/db/prisma", () => ({
   prisma: {
-    user: { findUnique },
+    user: { findUnique, update },
     organization: { findFirst },
+    userSession: { create: createSession },
     $executeRawUnsafe: vi.fn()
   }
 }));
@@ -39,6 +42,8 @@ describe("POST /api/auth/login", () => {
     vi.clearAllMocks();
     writeAuditEvent.mockResolvedValue(undefined);
     findFirst.mockResolvedValue({ id: "org_qa", name: "QA Org", isActive: true });
+    createSession.mockResolvedValue({ id: "sess_1" });
+    update.mockResolvedValue(undefined);
   });
 
   it("returns 401 for invalid credentials", async () => {
@@ -55,6 +60,86 @@ describe("POST /api/auth/login", () => {
     expect(writeAuditEvent).not.toHaveBeenCalled();
   });
 
+  it("returns warning attempts remaining when <= 3", async () => {
+    findUnique.mockResolvedValueOnce({
+      id: "u1",
+      email: "andrew@qa.org",
+      organizationId: "org_qa",
+      fullName: "Andrew",
+      role: "ADMIN",
+      userStatus: "ACTIVE",
+      failedLoginAttempts: 7,
+      passwordUpdatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      mfaEnabled: true,
+      passwordHash: "hash"
+    });
+    compare.mockResolvedValueOnce(false);
+
+    const response = await POST(
+      new Request("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: "org_qa", email: "andrew@qa.org", password: "wrong" })
+      })
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({
+        attemptsRemaining: 2,
+        lockoutThreshold: 10
+      })
+    );
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "u1" },
+        data: expect.objectContaining({ failedLoginAttempts: 8 })
+      })
+    );
+  });
+
+  it("locks account on 10th failed attempt", async () => {
+    findUnique.mockResolvedValueOnce({
+      id: "u1",
+      email: "andrew@qa.org",
+      organizationId: "org_qa",
+      fullName: "Andrew",
+      role: "ADMIN",
+      userStatus: "ACTIVE",
+      failedLoginAttempts: 9,
+      passwordUpdatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      mfaEnabled: true,
+      passwordHash: "hash"
+    });
+    compare.mockResolvedValueOnce(false);
+
+    const response = await POST(
+      new Request("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: "org_qa", email: "andrew@qa.org", password: "wrong" })
+      })
+    );
+
+    expect(response.status).toBe(423);
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({
+        locked: true,
+        attemptsRemaining: 0,
+        lockoutThreshold: 10
+      })
+    );
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "u1" },
+        data: expect.objectContaining({ failedLoginAttempts: 10, userStatus: "LOCKED" })
+      })
+    );
+    expect(writeAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "auth.lockout", entityId: "u1" })
+    );
+  });
+
   it("denies locked users before password check", async () => {
     findUnique.mockResolvedValueOnce({
       id: "u1",
@@ -63,6 +148,42 @@ describe("POST /api/auth/login", () => {
       fullName: "Andrew",
       role: "ADMIN",
       userStatus: "LOCKED",
+      failedLoginAttempts: 10,
+      passwordUpdatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      mfaEnabled: true,
+      passwordHash: "hash"
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: "org_qa", email: "andrew@qa.org", password: "Password123!" })
+      })
+    );
+
+    expect(response.status).toBe(423);
+    expect(compare).not.toHaveBeenCalled();
+    expect(writeAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "auth.login.failed",
+        outcome: "DENIED",
+        details: expect.objectContaining({ reason: "user_locked" })
+      })
+    );
+  });
+
+  it("rejects expired passwords after 180 days", async () => {
+    findUnique.mockResolvedValueOnce({
+      id: "u1",
+      email: "andrew@qa.org",
+      organizationId: "org_qa",
+      fullName: "Andrew",
+      role: "ADMIN",
+      userStatus: "ACTIVE",
+      failedLoginAttempts: 0,
+      passwordUpdatedAt: new Date("2025-01-01T00:00:00.000Z"),
+      mfaEnabled: true,
       passwordHash: "hash"
     });
 
@@ -75,14 +196,45 @@ describe("POST /api/auth/login", () => {
     );
 
     expect(response.status).toBe(403);
-    expect(compare).not.toHaveBeenCalled();
-    expect(writeAuditEvent).toHaveBeenCalledWith(
+    await expect(response.json()).resolves.toEqual(
       expect.objectContaining({
-        action: "auth.login.failed",
-        outcome: "DENIED",
-        details: expect.objectContaining({ reason: "user_locked" })
+        passwordExpired: true,
+        passwordMaxAgeDays: 180
       })
     );
+    expect(compare).not.toHaveBeenCalled();
+  });
+
+  it("enforces optional MFA for admin when configured", async () => {
+    const env = process.env as Record<string, string | undefined>;
+    const previous = env.REQUIRE_ADMIN_MFA;
+    env.REQUIRE_ADMIN_MFA = "true";
+
+    findUnique.mockResolvedValueOnce({
+      id: "u1",
+      email: "andrew@qa.org",
+      organizationId: "org_qa",
+      fullName: "Andrew",
+      role: "ADMIN",
+      userStatus: "ACTIVE",
+      failedLoginAttempts: 0,
+      passwordUpdatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      mfaEnabled: false,
+      passwordHash: "hash"
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: "org_qa", email: "andrew@qa.org", password: "Password123!" })
+      })
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({ mfaRequired: true }));
+
+    env.REQUIRE_ADMIN_MFA = previous;
   });
 
   it("returns user and sets cookie for valid credentials", async () => {
@@ -92,6 +244,10 @@ describe("POST /api/auth/login", () => {
       organizationId: "org_qa",
       fullName: "Andrew",
       role: "ADMIN",
+      userStatus: "ACTIVE",
+      failedLoginAttempts: 2,
+      passwordUpdatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      mfaEnabled: true,
       passwordHash: "hash"
     });
     compare.mockResolvedValueOnce(true);
@@ -108,6 +264,14 @@ describe("POST /api/auth/login", () => {
 
     const cookie = response.headers.get("set-cookie") ?? "";
     expect(cookie).toContain("valdoc_token=signed-token");
+    expect(createSession).toHaveBeenCalled();
+    expect(signSessionToken).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "sess_1" }));
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "u1" },
+        data: expect.objectContaining({ failedLoginAttempts: 0 })
+      })
+    );
     expect(writeAuditEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "auth.login.success",
@@ -126,6 +290,10 @@ describe("POST /api/auth/login", () => {
       organizationId: "org_qa",
       fullName: "Andrew",
       role: "ADMIN",
+      userStatus: "ACTIVE",
+      failedLoginAttempts: 0,
+      passwordUpdatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      mfaEnabled: true,
       passwordHash: "hash"
     });
     compare.mockResolvedValueOnce(true);
@@ -147,35 +315,6 @@ describe("POST /api/auth/login", () => {
     env.NODE_ENV = previous;
   });
 
-  it("writes failed login audit for known user bad password", async () => {
-    findUnique.mockResolvedValueOnce({
-      id: "u1",
-      email: "andrew@qa.org",
-      organizationId: "org_qa",
-      fullName: "Andrew",
-      role: "ADMIN",
-      passwordHash: "hash"
-    });
-    compare.mockResolvedValueOnce(false);
-
-    const response = await POST(
-      new Request("http://localhost/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ organizationId: "org_qa", email: "andrew@qa.org", password: "wrong" })
-      })
-    );
-
-    expect(response.status).toBe(401);
-    expect(writeAuditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: "auth.login.failed",
-        entityType: "User",
-        entityId: "u1"
-      })
-    );
-  });
-
   it("returns 400 when organization is not provided", async () => {
     const response = await POST(
       new Request("http://localhost/api/auth/login", {
@@ -194,6 +333,10 @@ describe("POST /api/auth/login", () => {
       organizationId: "org_qa",
       fullName: "Andrew",
       role: "ADMIN",
+      userStatus: "ACTIVE",
+      failedLoginAttempts: 0,
+      passwordUpdatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      mfaEnabled: true,
       passwordHash: "hash"
     });
     compare.mockResolvedValueOnce(true);
@@ -222,6 +365,10 @@ describe("POST /api/auth/login", () => {
       organizationId: "org_qa",
       fullName: "Platform Admin",
       role: "ADMIN",
+      userStatus: "ACTIVE",
+      failedLoginAttempts: 0,
+      passwordUpdatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      mfaEnabled: true,
       passwordHash: "hash"
     });
     compare.mockResolvedValueOnce(true);

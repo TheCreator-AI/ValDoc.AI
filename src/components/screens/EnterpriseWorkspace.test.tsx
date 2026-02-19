@@ -215,7 +215,36 @@ describe("EnterpriseWorkspace facts folder", () => {
     await screen.findByRole("button", { name: "View Equipment and Units" });
   });
 
+  it("shows remaining-attempt warning when login has <=3 attempts left", async () => {
+    vi.restoreAllMocks();
+    vi.spyOn(global, "fetch").mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith("/api/auth/organizations")) {
+        return jsonResponse([{ id: "org-amnion", name: "Amnion" }]);
+      }
+      if (url.endsWith("/api/auth/me")) {
+        return jsonResponse({ error: "Not authenticated" }, 401);
+      }
+      if (url.endsWith("/api/auth/login") && init?.method === "POST") {
+        return jsonResponse({ error: "Invalid credentials.", attemptsRemaining: 2, lockoutThreshold: 10 }, 401);
+      }
+      return jsonResponse({ error: "Not found" }, 404);
+    });
+
+    render(<EnterpriseWorkspace />);
+
+    fireEvent.change(await screen.findByRole("combobox", { name: "Organization" }), {
+      target: { value: "org-amnion" }
+    });
+    fireEvent.change(screen.getByPlaceholderText("email"), { target: { value: "admin@amnion.com" } });
+    fireEvent.change(screen.getByPlaceholderText("password"), { target: { value: "wrong" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(await screen.findByText("Warning: 2 login attempts remaining before lockout.")).toBeInTheDocument();
+  });
+
   it("shows organization selector on login screen", async () => {
+    vi.restoreAllMocks();
     vi.spyOn(global, "fetch").mockImplementation((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.endsWith("/api/auth/organizations")) {
@@ -229,7 +258,7 @@ describe("EnterpriseWorkspace facts folder", () => {
 
     render(<EnterpriseWorkspace />);
     expect(await screen.findByRole("combobox", { name: "Organization" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Amnion" })).toBeInTheDocument();
+    expect(screen.getAllByRole("option", { name: "Amnion" }).length).toBeGreaterThan(0);
   });
 
   it("renders Export Configuration as a button left of Refresh and navigates in same tab", async () => {
