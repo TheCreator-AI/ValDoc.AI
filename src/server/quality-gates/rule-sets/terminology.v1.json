@@ -1,0 +1,7 @@
+{
+  "docType": "PACKAGE",
+  "version": "v1",
+  "rules": [
+    "TERMINOLOGY_UNDEFINED_ACRONYM"
+  ]
+}

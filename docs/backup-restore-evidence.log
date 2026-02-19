@@ -1,0 +1,11 @@
+[backup_db] artifact=C:\deploy\valdoc-ai\backups\valdoc-db-20260218-124501.backup.enc
+[backup_db] docs=12 audits=284
+[backup_db] audit_chain_head=2de3f6b1262f0d94c714f0cf14f62b91f1cdce6cff8078ce62ba0ec3a0e9698a
+[restore_db] restored=C:\deploy\valdoc-ai\storage\db\dev.db
+[restore_db] docs=12 audits=284
+[restore_db] audit_chain_head=2de3f6b1262f0d94c714f0cf14f62b91f1cdce6cff8078ce62ba0ec3a0e9698a
+[verify_restore] pass=true
+[verify_restore] expected_docs=12 actual_docs=12
+[verify_restore] expected_audits=284 actual_audits=284
+[verify_restore] expected_chain_head=2de3f6b1262f0d94c714f0cf14f62b91f1cdce6cff8078ce62ba0ec3a0e9698a
+[verify_restore] actual_chain_head=2de3f6b1262f0d94c714f0cf14f62b91f1cdce6cff8078ce62ba0ec3a0e9698a

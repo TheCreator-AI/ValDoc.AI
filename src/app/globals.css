@@ -1,0 +1,321 @@
+:root {
+  --bg: #f4f7fb;
+  --surface: #ffffff;
+  --surface-alt: #eef3f9;
+  --text: #0f1a2a;
+  --muted: #607089;
+  --accent: #1563ff;
+  --danger: #d22c2c;
+  --border: #d4ddec;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: linear-gradient(160deg, #f4f7fb 0%, #ecf3ff 100%);
+  color: var(--text);
+  font-family: var(--font-plex-sans), "Segoe UI", system-ui, sans-serif;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+}
+
+.page {
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.topBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-bottom: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.topBarBrand {
+  flex: 1 1 520px;
+  min-width: 0;
+}
+
+.topBar h1 {
+  font-size: 24px;
+}
+
+.topBar p {
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.authPanel {
+  max-width: 460px;
+  margin: 80px auto;
+}
+
+.panel h2 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.panel p {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.inputs {
+  display: grid;
+  gap: 8px;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+textarea {
+  resize: vertical;
+}
+
+button {
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: white;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.authButton {
+  background: #0f1a2a;
+}
+
+.dropZone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: #fafcff;
+  display: grid;
+  gap: 8px;
+}
+
+.dragOver {
+  border-color: var(--accent);
+  background: #eef4ff;
+}
+
+.docList {
+  display: grid;
+  gap: 8px;
+}
+
+.docCard {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  background: #fbfdff;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.modeTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.modeTabs button {
+  background: #dbe7ff;
+  color: #0f1a2a;
+}
+
+.modeTabs .activeTab {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.topBarAction {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.topBarControls {
+  justify-content: flex-end;
+  align-items: flex-start;
+  flex: 0 1 auto;
+}
+
+.row button:nth-child(3) {
+  background: var(--danger);
+}
+
+.unitBoard {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.unitLane {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  background: #f9fbff;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.groupLane {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 6px;
+}
+
+.unitChip {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.unitChip button:last-child {
+  background: var(--danger);
+}
+
+.statusSaved {
+  color: #1f8a3b;
+  font-weight: 600;
+}
+
+.statusFailed {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.auditTimeStatus p {
+  overflow-wrap: anywhere;
+}
+
+.auditFiltersRow input {
+  flex: 1 1 190px;
+  min-width: 0;
+}
+
+.auditFiltersRow button,
+.auditFiltersRow a {
+  flex: 0 0 auto;
+}
+
+.auditFiltersRow a {
+  border-radius: 10px;
+  background: var(--accent);
+  color: #ffffff;
+  padding: 10px 12px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.panel table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.auditTable {
+  table-layout: fixed;
+}
+
+.auditTable th,
+.auditTable td {
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
+.auditTable th:nth-child(1),
+.auditTable td:nth-child(1) {
+  min-width: 220px;
+}
+
+.auditTable th:nth-child(2),
+.auditTable td:nth-child(2) {
+  min-width: 190px;
+}
+
+.auditTable th:nth-child(3),
+.auditTable td:nth-child(3) {
+  min-width: 140px;
+}
+
+.auditTable th:nth-child(4),
+.auditTable td:nth-child(4) {
+  min-width: 220px;
+}
+
+@media (max-width: 1100px) {
+  .grid3 {
+    grid-template-columns: 1fr;
+  }
+  .unitBoard {
+    grid-template-columns: 1fr;
+  }
+  .topBarControls {
+    width: 100%;
+    justify-content: flex-start;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+  }
+}

@@ -1,0 +1,78 @@
+version: "3.9"
+
+services:
+  app:
+    image: node:24-bookworm
+    working_dir: /workspace
+    command: >
+      sh -c "npm ci &&
+             npm run db:generate &&
+             npm run db:push &&
+             npm run dev -- --hostname 0.0.0.0 --port 3000"
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-file:./storage/db/dev.db}
+      JWT_SECRET: ${JWT_SECRET}
+      NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-ValDoc.AI}
+      ENABLE_OPENSEARCH: ${ENABLE_OPENSEARCH:-false}
+      OPENSEARCH_URL: ${OPENSEARCH_URL:-http://opensearch:9200}
+      EXPORT_RETENTION_DAYS: ${EXPORT_RETENTION_DAYS:-365}
+      SOURCE_RETENTION_DAYS: ${SOURCE_RETENTION_DAYS:-365}
+      DOCUMENT_RETENTION_DAYS: ${DOCUMENT_RETENTION_DAYS:-365}
+      AUDIT_RETENTION_DAYS: ${AUDIT_RETENTION_DAYS:-2555}
+    volumes:
+      - ./:/workspace
+      - db_data:/workspace/storage/db
+      - app_storage:/workspace/storage/uploads
+      - app_exports:/workspace/storage/exports
+    depends_on:
+      - db
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  db:
+    image: busybox:1.36
+    command: sh -c "mkdir -p /data && touch /data/dev.db && tail -f /dev/null"
+    volumes:
+      - db_data:/data
+
+  opensearch:
+    image: opensearchproject/opensearch:2.18.0
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: ${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-ChangeMe123!}
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    profiles:
+      - search
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+  minio:
+    image: minio/minio:RELEASE.2026-01-10T03-19-41Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    profiles:
+      - object-storage
+
+volumes:
+  db_data:
+  app_storage:
+  app_exports:
+  minio_data:

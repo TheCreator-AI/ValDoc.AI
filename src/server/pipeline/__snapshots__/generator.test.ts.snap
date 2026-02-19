@@ -1,0 +1,454 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pipeline artifact generation > generates deterministic artifacts for same input 1`] = `
+{
+  "ioqPayload": {
+    "metadata": {
+      "doc_type": "IOQ",
+      "doc_version": "v1",
+      "equipment_id": "TSX2320FA20",
+      "generated_at": "2026-02-17T12:00:00.000Z",
+      "generated_by": "andrew@qa.org",
+      "system_name": "TSX Freezer",
+    },
+    "revision_history": [
+      {
+        "change_summary": "Initial deterministic IOQ protocol generated.",
+        "changed_at": "2026-02-17T12:00:00.000Z",
+        "changed_by": "andrew@qa.org",
+        "version": "v1.0",
+      },
+    ],
+    "test_cases": [
+      {
+        "evidence_required": "Utility connection record, photographs, and commissioning checklist.",
+        "expected_results": [
+          "Utilities Verification is compliant with installation requirements.",
+          "Fact alignment: line_voltage=120 V",
+        ],
+        "linked_req_ids": [
+          "URS-003",
+        ],
+        "linked_risk_ids": [
+          "RA-003",
+        ],
+        "objective": "Verify utilities verification is installed/configured as defined.",
+        "pass_fail": "PENDING",
+        "prerequisites": [
+          "Approved installation package is available.",
+          "Equipment is safe to inspect in installation state.",
+        ],
+        "steps": [
+          "Inspect utilities verification against configured baseline and recorded facts.",
+          "Record actual observed values and installation evidence.",
+          "Compare observed state to expected installation criteria and document deviations.",
+        ],
+        "test_id": "IOQ-001",
+      },
+      {
+        "evidence_required": "Nameplate photos and asset register entry.",
+        "expected_results": [
+          "Model and Serial Capture is compliant with installation requirements.",
+          "Fact alignment: No matching structured fact captured.",
+        ],
+        "linked_req_ids": [
+          "FACT:temperature_setpoint",
+        ],
+        "linked_risk_ids": [],
+        "objective": "Verify model and serial capture is installed/configured as defined.",
+        "pass_fail": "PENDING",
+        "prerequisites": [
+          "Approved installation package is available.",
+          "Equipment is safe to inspect in installation state.",
+        ],
+        "steps": [
+          "Inspect model and serial capture against configured baseline and recorded facts.",
+          "Record actual observed values and installation evidence.",
+          "Compare observed state to expected installation criteria and document deviations.",
+        ],
+        "test_id": "IOQ-002",
+      },
+      {
+        "evidence_required": "Version screenshot or service report.",
+        "expected_results": [
+          "Software/Firmware Verification is compliant with installation requirements.",
+          "Fact alignment: No matching structured fact captured.",
+        ],
+        "linked_req_ids": [
+          "FACT:temperature_setpoint",
+        ],
+        "linked_risk_ids": [],
+        "objective": "Verify software/firmware verification is installed/configured as defined.",
+        "pass_fail": "PENDING",
+        "prerequisites": [
+          "Approved installation package is available.",
+          "Equipment is safe to inspect in installation state.",
+        ],
+        "steps": [
+          "Inspect software/firmware verification against configured baseline and recorded facts.",
+          "Record actual observed values and installation evidence.",
+          "Compare observed state to expected installation criteria and document deviations.",
+        ],
+        "test_id": "IOQ-003",
+      },
+      {
+        "evidence_required": "Current calibration certificate and due date record.",
+        "expected_results": [
+          "Calibration Status Verification is compliant with installation requirements.",
+          "Fact alignment: No matching structured fact captured.",
+        ],
+        "linked_req_ids": [
+          "FACT:temperature_setpoint",
+        ],
+        "linked_risk_ids": [],
+        "objective": "Verify calibration status verification is installed/configured as defined.",
+        "pass_fail": "PENDING",
+        "prerequisites": [
+          "Approved installation package is available.",
+          "Equipment is safe to inspect in installation state.",
+        ],
+        "steps": [
+          "Inspect calibration status verification against configured baseline and recorded facts.",
+          "Record actual observed values and installation evidence.",
+          "Compare observed state to expected installation criteria and document deviations.",
+        ],
+        "test_id": "IOQ-004",
+      },
+      {
+        "evidence_required": "Environmental log and room condition snapshot.",
+        "expected_results": [
+          "Environmental Requirements Verification is compliant with installation requirements.",
+          "Fact alignment: temperature_setpoint=-20 C",
+        ],
+        "linked_req_ids": [
+          "URS-001",
+        ],
+        "linked_risk_ids": [
+          "RA-001",
+        ],
+        "objective": "Verify environmental requirements verification is installed/configured as defined.",
+        "pass_fail": "PENDING",
+        "prerequisites": [
+          "Approved installation package is available.",
+          "Equipment is safe to inspect in installation state.",
+        ],
+        "steps": [
+          "Inspect environmental requirements verification against configured baseline and recorded facts.",
+          "Record actual observed values and installation evidence.",
+          "Compare observed state to expected installation criteria and document deviations.",
+        ],
+        "test_id": "IOQ-005",
+      },
+    ],
+  },
+  "oqPayload": {
+    "metadata": {
+      "doc_type": "OQ",
+      "doc_version": "v1",
+      "equipment_id": "TSX2320FA20",
+      "generated_at": "2026-02-17T12:00:00.000Z",
+      "generated_by": "andrew@qa.org",
+      "system_name": "TSX Freezer",
+    },
+    "revision_history": [
+      {
+        "change_summary": "Initial deterministic OQ protocol generated from URS + RA.",
+        "changed_at": "2026-02-17T12:00:00.000Z",
+        "changed_by": "andrew@qa.org",
+        "version": "v1.0",
+      },
+    ],
+    "test_cases": [
+      {
+        "evidence_required": "Completed OQ worksheet, raw data capture, and reviewer sign-off.",
+        "expected_results": [
+          "Requirement URS-001 acceptance criteria achieved.",
+          "Operational behavior remains controlled with no unexplained deviations.",
+        ],
+        "linked_req_ids": [
+          "URS-001",
+        ],
+        "linked_risk_ids": [
+          "RA-001",
+        ],
+        "objective": "Verify operational compliance for URS-001.",
+        "pass_fail": "PENDING",
+        "prerequisites": [
+          "Approved URS and RA are available.",
+          "Equipment installation qualification is complete.",
+        ],
+        "steps": [
+          "Configure the equipment for operational challenge of URS-001.",
+          "Execute the challenge against acceptance criteria: temperature setpoint is verified at -20 C.",
+          "Confirm associated risk controls are active: Input validation and range checks (OQ); Calibration and preventive maintenance (IQ)",
+          "Record observations and measured values in the OQ worksheet.",
+        ],
+        "test_id": "OQ-001",
+      },
+      {
+        "evidence_required": "Completed OQ worksheet, raw data capture, and reviewer sign-off.",
+        "expected_results": [
+          "Requirement URS-002 acceptance criteria achieved.",
+          "Operational behavior remains controlled with no unexplained deviations.",
+        ],
+        "linked_req_ids": [
+          "URS-002",
+        ],
+        "linked_risk_ids": [
+          "RA-002",
+        ],
+        "objective": "Verify operational compliance for URS-002.",
+        "pass_fail": "PENDING",
+        "prerequisites": [
+          "Approved URS and RA are available.",
+          "Equipment installation qualification is complete.",
+        ],
+        "steps": [
+          "Configure the equipment for operational challenge of URS-002.",
+          "Execute the challenge against acceptance criteria: high temp alarm is verified at Enabled.",
+          "Confirm associated risk controls are active: Alarm configuration and escalation (OQ)",
+          "Record observations and measured values in the OQ worksheet.",
+        ],
+        "test_id": "OQ-002",
+      },
+      {
+        "evidence_required": "Completed OQ worksheet, raw data capture, and reviewer sign-off.",
+        "expected_results": [
+          "Requirement URS-003 acceptance criteria achieved.",
+          "Operational behavior remains controlled with no unexplained deviations.",
+        ],
+        "linked_req_ids": [
+          "URS-003",
+        ],
+        "linked_risk_ids": [
+          "RA-003",
+        ],
+        "objective": "Verify operational compliance for URS-003.",
+        "pass_fail": "PENDING",
+        "prerequisites": [
+          "Approved URS and RA are available.",
+          "Equipment installation qualification is complete.",
+        ],
+        "steps": [
+          "Configure the equipment for operational challenge of URS-003.",
+          "Execute the challenge against acceptance criteria: line voltage is verified at 120 V.",
+          "Confirm associated risk controls are active: Approved SOP and training records (Doc Review)",
+          "Record observations and measured values in the OQ worksheet.",
+        ],
+        "test_id": "OQ-003",
+      },
+    ],
+  },
+  "raPayload": {
+    "metadata": {
+      "doc_type": "RA",
+      "doc_version": "v1",
+      "equipment_id": "TSX2320FA20",
+      "generated_at": "2026-02-17T12:00:00.000Z",
+      "generated_by": "andrew@qa.org",
+      "system_name": "TSX Freezer",
+    },
+    "revision_history": [
+      {
+        "change_summary": "Initial RA generated from URS requirements.",
+        "changed_at": "2026-02-17T12:00:00.000Z",
+        "changed_by": "andrew@qa.org",
+        "version": "v1.0",
+      },
+    ],
+    "risks": [
+      {
+        "cause": "Sensor drift",
+        "controls": [
+          "Input validation and range checks (OQ)",
+          "Calibration and preventive maintenance (IQ)",
+        ],
+        "detection": 2,
+        "hazard": "product_quality",
+        "impact": "Product quality attributes may not be maintained.",
+        "initial_risk": 24,
+        "linked_req_ids": [
+          "URS-001",
+        ],
+        "occurrence": 3,
+        "residual_risk": 16,
+        "risk_id": "RA-001",
+        "severity": 4,
+        "verification_test_ids": [
+          "VT-001-1",
+          "VT-001-2",
+        ],
+      },
+      {
+        "cause": "Alarm escalation failure",
+        "controls": [
+          "Alarm configuration and escalation (OQ)",
+        ],
+        "detection": 3,
+        "hazard": "patient_safety",
+        "impact": "Potential downstream impact to patient safety.",
+        "initial_risk": 45,
+        "linked_req_ids": [
+          "URS-002",
+        ],
+        "occurrence": 3,
+        "residual_risk": 34,
+        "risk_id": "RA-002",
+        "severity": 5,
+        "verification_test_ids": [
+          "VT-002-1",
+        ],
+      },
+      {
+        "cause": "Procedure not followed",
+        "controls": [
+          "Approved SOP and training records (Doc Review)",
+        ],
+        "detection": 2,
+        "hazard": "compliance",
+        "impact": "Regulatory non-compliance risk.",
+        "initial_risk": 12,
+        "linked_req_ids": [
+          "URS-003",
+        ],
+        "occurrence": 2,
+        "residual_risk": 10,
+        "risk_id": "RA-003",
+        "severity": 3,
+        "verification_test_ids": [
+          "VT-003-1",
+        ],
+      },
+    ],
+  },
+  "tmPayload": {
+    "mappings": [
+      {
+        "output_reference": {
+          "output_document_ref": "TSX2320FA20/TM",
+          "output_section_ref": "REQ:URS-001",
+          "template_doc_type": "TM",
+        },
+        "req_id": "URS-001",
+        "risk_ids": [
+          "RA-001",
+        ],
+        "test_ids": [
+          "IOQ-005",
+          "OQ-001",
+        ],
+      },
+      {
+        "output_reference": {
+          "output_document_ref": "TSX2320FA20/TM",
+          "output_section_ref": "REQ:URS-002",
+          "template_doc_type": "TM",
+        },
+        "req_id": "URS-002",
+        "risk_ids": [
+          "RA-002",
+        ],
+        "test_ids": [
+          "OQ-002",
+        ],
+      },
+      {
+        "output_reference": {
+          "output_document_ref": "TSX2320FA20/TM",
+          "output_section_ref": "REQ:URS-003",
+          "template_doc_type": "TM",
+        },
+        "req_id": "URS-003",
+        "risk_ids": [
+          "RA-003",
+        ],
+        "test_ids": [
+          "IOQ-001",
+          "OQ-003",
+        ],
+      },
+    ],
+    "metadata": {
+      "doc_type": "TM",
+      "doc_version": "v1",
+      "equipment_id": "TSX2320FA20",
+      "generated_at": "2026-02-17T12:00:00.000Z",
+      "generated_by": "andrew@qa.org",
+      "system_name": "TSX Freezer",
+    },
+    "revision_history": [
+      {
+        "change_summary": "Initial traceability matrix generated from URS, RA, IOQ, and OQ.",
+        "changed_at": "2026-02-17T12:00:00.000Z",
+        "changed_by": "andrew@qa.org",
+        "version": "v1.0",
+      },
+    ],
+  },
+  "ursPayload": {
+    "metadata": {
+      "doc_type": "URS",
+      "doc_version": "v1",
+      "equipment_id": "TSX2320FA20",
+      "generated_at": "2026-02-17T12:00:00.000Z",
+      "generated_by": "andrew@qa.org",
+      "system_name": "TSX Freezer",
+    },
+    "requirements": [
+      {
+        "acceptance_criteria": "temperature setpoint is verified at -20 C.",
+        "category": "RANGE",
+        "criticality": "MEDIUM",
+        "linked_risk_ids": [
+          "RA-001",
+        ],
+        "rationale": "Supports intended use: Store temperature sensitive materials at controlled setpoint.",
+        "req_id": "URS-001",
+        "source_refs": [
+          "FACT:temperature_setpoint",
+        ],
+        "statement": "The system shall meet temperature setpoint at -20 C.",
+        "test_method": "OQ",
+      },
+      {
+        "acceptance_criteria": "high temp alarm is verified at Enabled.",
+        "category": "SAFETY",
+        "criticality": "HIGH",
+        "linked_risk_ids": [
+          "RA-002",
+        ],
+        "rationale": "Supports intended use: Store temperature sensitive materials at controlled setpoint.",
+        "req_id": "URS-002",
+        "source_refs": [
+          "FACT:high_temp_alarm",
+        ],
+        "statement": "The system shall meet high temp alarm at Enabled.",
+        "test_method": "Doc Review",
+      },
+      {
+        "acceptance_criteria": "line voltage is verified at 120 V.",
+        "category": "UTILITY",
+        "criticality": "LOW",
+        "linked_risk_ids": [
+          "RA-003",
+        ],
+        "rationale": "Supports intended use: Store temperature sensitive materials at controlled setpoint.",
+        "req_id": "URS-003",
+        "source_refs": [
+          "FACT:line_voltage",
+        ],
+        "statement": "The system shall meet line voltage at 120 V.",
+        "test_method": "Doc Review",
+      },
+    ],
+    "revision_history": [
+      {
+        "change_summary": "Initial URS generated from equipment facts and intended use.",
+        "changed_at": "2026-02-17T12:00:00.000Z",
+        "changed_by": "andrew@qa.org",
+        "version": "v1.0",
+      },
+    ],
+  },
+}
+`;

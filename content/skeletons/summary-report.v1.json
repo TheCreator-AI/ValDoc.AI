@@ -1,0 +1,57 @@
+{
+  "doc_type": "SUMMARY_REPORT",
+  "version": "v1",
+  "sections": [
+    {
+      "id": "purpose",
+      "order": 1,
+      "heading": "Purpose",
+      "populate_from": ["metadata.system_name", "metadata.equipment_id"],
+      "layout": "text"
+    },
+    {
+      "id": "execution_summary",
+      "order": 2,
+      "heading": "Execution Summary",
+      "populate_from": ["summary.execution_overview"],
+      "layout": "text"
+    },
+    {
+      "id": "results_table",
+      "order": 3,
+      "heading": "Qualification Results",
+      "populate_from": ["summary.results[]"],
+      "layout": "table",
+      "table_layout": {
+        "columns": ["phase", "protocol_ref", "status", "deviations", "conclusion"]
+      }
+    },
+    {
+      "id": "traceability_confirmation",
+      "order": 4,
+      "heading": "Traceability Confirmation",
+      "populate_from": ["traceability.mappings[]"],
+      "layout": "text"
+    },
+    {
+      "id": "revision_history",
+      "order": 5,
+      "heading": "Revision History",
+      "populate_from": ["revision_history[]"],
+      "layout": "table",
+      "table_layout": {
+        "columns": ["version", "changed_at", "changed_by", "change_summary"]
+      }
+    },
+    {
+      "id": "approvals_signatures",
+      "order": 6,
+      "heading": "Approvals and Signatures",
+      "populate_from": ["approvals[]", "signatures[]"],
+      "layout": "table",
+      "table_layout": {
+        "columns": ["role", "name", "date", "signature_status"]
+      }
+    }
+  ]
+}

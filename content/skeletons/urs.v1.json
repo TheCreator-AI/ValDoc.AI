@@ -1,0 +1,67 @@
+{
+  "doc_type": "URS",
+  "version": "v1",
+  "sections": [
+    {
+      "id": "purpose",
+      "order": 1,
+      "heading": "Purpose",
+      "populate_from": ["metadata.system_name", "metadata.equipment_id"],
+      "layout": "text"
+    },
+    {
+      "id": "scope",
+      "order": 2,
+      "heading": "Scope",
+      "populate_from": ["metadata.system_name", "metadata.equipment_id"],
+      "layout": "text"
+    },
+    {
+      "id": "user_requirements",
+      "order": 3,
+      "heading": "User Requirements",
+      "populate_from": ["requirements[]"],
+      "layout": "table",
+      "table_layout": {
+        "columns": [
+          "req_id",
+          "category",
+          "statement",
+          "rationale",
+          "source_refs",
+          "acceptance_criteria",
+          "test_method",
+          "criticality",
+          "linked_risk_ids"
+        ]
+      }
+    },
+    {
+      "id": "traceability_notes",
+      "order": 4,
+      "heading": "Traceability Notes",
+      "populate_from": ["requirements[].linked_risk_ids"],
+      "layout": "text"
+    },
+    {
+      "id": "revision_history",
+      "order": 5,
+      "heading": "Revision History",
+      "populate_from": ["revision_history[]"],
+      "layout": "table",
+      "table_layout": {
+        "columns": ["version", "changed_at", "changed_by", "change_summary"]
+      }
+    },
+    {
+      "id": "approvals_signatures",
+      "order": 6,
+      "heading": "Approvals and Signatures",
+      "populate_from": ["approvals[]", "signatures[]"],
+      "layout": "table",
+      "table_layout": {
+        "columns": ["role", "name", "date", "signature_status"]
+      }
+    }
+  ]
+}

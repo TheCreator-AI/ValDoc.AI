@@ -1,0 +1,12 @@
+{
+  "docType": "RID",
+  "version": "v1",
+  "rules": [
+    "RA_RISKS_MISSING",
+    "RA_SCORING_REQUIRED",
+    "RA_CONTROLS_REQUIRED",
+    "RA_LINKED_REQ_REQUIRED",
+    "RA_VERIFICATION_REQUIRED",
+    "TRACE_HIGH_RISK_UNMAPPED"
+  ]
+}

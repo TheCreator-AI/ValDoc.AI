@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test-and-quality:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: file:./prisma/dev.db
+      JWT_SECRET: ci-secret-please-change-before-production-012345
+      CUSTOMER_ID: qa-org
+      ORG_NAME: QA Organization
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+  security-gates:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Dependency audit (high+)
+        run: npm run security:audit
+
+      - name: Setup Semgrep
+        uses: semgrep/setup-semgrep@v1
+
+      - name: Semgrep SAST (error severity)
+        run: npm run security:sast
+
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml

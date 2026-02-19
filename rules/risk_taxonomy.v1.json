@@ -1,0 +1,65 @@
+{
+  "version": "v1",
+  "hazard_categories": [
+    {
+      "name": "data_integrity",
+      "keywords": ["data", "audit", "credential", "access", "record"],
+      "default_impact": "Loss or corruption of GxP records."
+    },
+    {
+      "name": "product_quality",
+      "keywords": ["temperature", "range", "stability", "quality", "contamination"],
+      "default_impact": "Product quality attributes may not be maintained."
+    },
+    {
+      "name": "patient_safety",
+      "keywords": ["safety", "alarm", "critical", "protection"],
+      "default_impact": "Potential downstream impact to patient safety."
+    },
+    {
+      "name": "compliance",
+      "keywords": ["compliance", "regulatory", "validation", "review"],
+      "default_impact": "Regulatory non-compliance risk."
+    }
+  ],
+  "common_causes": {
+    "data_integrity": [
+      "Misconfigured access controls",
+      "Audit logging disabled",
+      "Improper backup/restore process"
+    ],
+    "product_quality": [
+      "Sensor drift",
+      "Control loop misconfiguration",
+      "Utility interruption"
+    ],
+    "patient_safety": [
+      "Alarm escalation failure",
+      "Critical control not enforced",
+      "Delayed operator response"
+    ],
+    "compliance": [
+      "Procedure not followed",
+      "Insufficient documentation",
+      "Missing verification evidence"
+    ]
+  },
+  "control_library": [
+    { "id": "CTRL-RBAC", "name": "Role-based access control", "hazard_category": "data_integrity", "verification_test_type": "Doc Review", "effectiveness": 0.25 },
+    { "id": "CTRL-AUDIT", "name": "Audit trail enabled and reviewed", "hazard_category": "data_integrity", "verification_test_type": "Doc Review", "effectiveness": 0.2 },
+    { "id": "CTRL-BACKUP", "name": "Automated backups and restore challenge", "hazard_category": "data_integrity", "verification_test_type": "OQ", "effectiveness": 0.2 },
+    { "id": "CTRL-INPUT", "name": "Input validation and range checks", "hazard_category": "product_quality", "verification_test_type": "OQ", "effectiveness": 0.2 },
+    { "id": "CTRL-CAL", "name": "Calibration and preventive maintenance", "hazard_category": "product_quality", "verification_test_type": "IQ", "effectiveness": 0.15 },
+    { "id": "CTRL-ALARM", "name": "Alarm configuration and escalation", "hazard_category": "patient_safety", "verification_test_type": "OQ", "effectiveness": 0.25 },
+    { "id": "CTRL-SOP", "name": "Approved SOP and training records", "hazard_category": "compliance", "verification_test_type": "Doc Review", "effectiveness": 0.2 }
+  ],
+  "scoring_model": {
+    "name": "sod_product",
+    "formula": "S*O*D",
+    "severity_range": [1, 5],
+    "occurrence_range": [1, 5],
+    "detection_range": [1, 5],
+    "min_risk": 1,
+    "max_risk": 125
+  }
+}

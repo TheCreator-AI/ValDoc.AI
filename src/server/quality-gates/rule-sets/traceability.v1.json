@@ -1,0 +1,8 @@
+{
+  "docType": "PACKAGE",
+  "version": "v1",
+  "rules": [
+    "TRACE_CRITICAL_REQ_UNMAPPED",
+    "TRACE_HIGH_RISK_UNMAPPED"
+  ]
+}

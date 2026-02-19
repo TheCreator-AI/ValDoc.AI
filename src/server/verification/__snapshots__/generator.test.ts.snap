@@ -1,0 +1,274 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`verification generators > generates deterministic IOQ payload 1`] = `
+{
+  "metadata": {
+    "doc_type": "IOQ",
+    "doc_version": "v1",
+    "equipment_id": "machine_tsx_2320",
+    "generated_at": "2026-02-17T10:00:00.000Z",
+    "generated_by": "andrew@qa.org",
+    "system_name": "TSX2320FA20",
+  },
+  "revision_history": [
+    {
+      "change_summary": "Initial deterministic IOQ protocol generated.",
+      "changed_at": "2026-02-17T10:00:00.000Z",
+      "changed_by": "andrew@qa.org",
+      "version": "v1.0",
+    },
+  ],
+  "test_cases": [
+    {
+      "evidence_required": "Utility connection record, photographs, and commissioning checklist.",
+      "expected_results": [
+        "Utilities Verification is compliant with installation requirements.",
+        "Fact alignment: line_voltage=120 +/- 10% V",
+      ],
+      "linked_req_ids": [
+        "URS-001",
+      ],
+      "linked_risk_ids": [
+        "RA-001",
+      ],
+      "objective": "Verify utilities verification is installed/configured as defined.",
+      "pass_fail": "PENDING",
+      "prerequisites": [
+        "Approved installation package is available.",
+        "Equipment is safe to inspect in installation state.",
+      ],
+      "steps": [
+        "Inspect utilities verification against configured baseline and recorded facts.",
+        "Record actual observed values and installation evidence.",
+        "Compare observed state to expected installation criteria and document deviations.",
+      ],
+      "test_id": "IOQ-001",
+    },
+    {
+      "evidence_required": "Nameplate photos and asset register entry.",
+      "expected_results": [
+        "Model and Serial Capture is compliant with installation requirements.",
+        "Fact alignment: No matching structured fact captured.",
+      ],
+      "linked_req_ids": [
+        "FACT:line_voltage",
+      ],
+      "linked_risk_ids": [],
+      "objective": "Verify model and serial capture is installed/configured as defined.",
+      "pass_fail": "PENDING",
+      "prerequisites": [
+        "Approved installation package is available.",
+        "Equipment is safe to inspect in installation state.",
+      ],
+      "steps": [
+        "Inspect model and serial capture against configured baseline and recorded facts.",
+        "Record actual observed values and installation evidence.",
+        "Compare observed state to expected installation criteria and document deviations.",
+      ],
+      "test_id": "IOQ-002",
+    },
+    {
+      "evidence_required": "Version screenshot or service report.",
+      "expected_results": [
+        "Software/Firmware Verification is compliant with installation requirements.",
+        "Fact alignment: firmware_version=v2.4.1",
+      ],
+      "linked_req_ids": [
+        "FACT:line_voltage",
+      ],
+      "linked_risk_ids": [],
+      "objective": "Verify software/firmware verification is installed/configured as defined.",
+      "pass_fail": "PENDING",
+      "prerequisites": [
+        "Approved installation package is available.",
+        "Equipment is safe to inspect in installation state.",
+      ],
+      "steps": [
+        "Inspect software/firmware verification against configured baseline and recorded facts.",
+        "Record actual observed values and installation evidence.",
+        "Compare observed state to expected installation criteria and document deviations.",
+      ],
+      "test_id": "IOQ-003",
+    },
+    {
+      "evidence_required": "Current calibration certificate and due date record.",
+      "expected_results": [
+        "Calibration Status Verification is compliant with installation requirements.",
+        "Fact alignment: No matching structured fact captured.",
+      ],
+      "linked_req_ids": [
+        "URS-002",
+      ],
+      "linked_risk_ids": [
+        "RA-002",
+      ],
+      "objective": "Verify calibration status verification is installed/configured as defined.",
+      "pass_fail": "PENDING",
+      "prerequisites": [
+        "Approved installation package is available.",
+        "Equipment is safe to inspect in installation state.",
+      ],
+      "steps": [
+        "Inspect calibration status verification against configured baseline and recorded facts.",
+        "Record actual observed values and installation evidence.",
+        "Compare observed state to expected installation criteria and document deviations.",
+      ],
+      "test_id": "IOQ-004",
+    },
+    {
+      "evidence_required": "Environmental log and room condition snapshot.",
+      "expected_results": [
+        "Environmental Requirements Verification is compliant with installation requirements.",
+        "Fact alignment: ambient_temperature=20-25 C",
+      ],
+      "linked_req_ids": [
+        "URS-002",
+      ],
+      "linked_risk_ids": [
+        "RA-002",
+      ],
+      "objective": "Verify environmental requirements verification is installed/configured as defined.",
+      "pass_fail": "PENDING",
+      "prerequisites": [
+        "Approved installation package is available.",
+        "Equipment is safe to inspect in installation state.",
+      ],
+      "steps": [
+        "Inspect environmental requirements verification against configured baseline and recorded facts.",
+        "Record actual observed values and installation evidence.",
+        "Compare observed state to expected installation criteria and document deviations.",
+      ],
+      "test_id": "IOQ-005",
+    },
+  ],
+}
+`;
+
+exports[`verification generators > generates deterministic OQ payload 1`] = `
+{
+  "metadata": {
+    "doc_type": "OQ",
+    "doc_version": "v1",
+    "equipment_id": "machine_tsx_2320",
+    "generated_at": "2026-02-17T10:00:00.000Z",
+    "generated_by": "andrew@qa.org",
+    "system_name": "TSX2320FA20",
+  },
+  "revision_history": [
+    {
+      "change_summary": "Initial deterministic OQ protocol generated from URS + RA.",
+      "changed_at": "2026-02-17T10:00:00.000Z",
+      "changed_by": "andrew@qa.org",
+      "version": "v1.0",
+    },
+  ],
+  "test_cases": [
+    {
+      "evidence_required": "Completed OQ worksheet, raw data capture, and reviewer sign-off.",
+      "expected_results": [
+        "Requirement URS-001 acceptance criteria achieved.",
+        "Operational behavior remains controlled with no unexplained deviations.",
+      ],
+      "linked_req_ids": [
+        "URS-001",
+      ],
+      "linked_risk_ids": [
+        "RA-001",
+      ],
+      "objective": "Verify operational compliance for URS-001.",
+      "pass_fail": "PENDING",
+      "prerequisites": [
+        "Approved URS and RA are available.",
+        "Equipment installation qualification is complete.",
+      ],
+      "steps": [
+        "Configure the equipment for operational challenge of URS-001.",
+        "Execute the challenge against acceptance criteria: Unit remains operational at nominal voltage range.",
+        "Confirm associated risk controls are active: Input validation (OQ); Audit trail (Doc Review)",
+        "Record observations and measured values in the OQ worksheet.",
+      ],
+      "test_id": "OQ-001",
+    },
+    {
+      "evidence_required": "Completed OQ worksheet, raw data capture, and reviewer sign-off.",
+      "expected_results": [
+        "Requirement URS-002 acceptance criteria achieved.",
+        "Operational behavior remains controlled with no unexplained deviations.",
+      ],
+      "linked_req_ids": [
+        "URS-002",
+      ],
+      "linked_risk_ids": [
+        "RA-002",
+      ],
+      "objective": "Verify operational compliance for URS-002.",
+      "pass_fail": "PENDING",
+      "prerequisites": [
+        "Approved URS and RA are available.",
+        "Equipment installation qualification is complete.",
+      ],
+      "steps": [
+        "Configure the equipment for operational challenge of URS-002.",
+        "Execute the challenge against acceptance criteria: Calibration status is current and documented.",
+        "Confirm associated risk controls are active: Calibration management (IQ)",
+        "Record observations and measured values in the OQ worksheet.",
+      ],
+      "test_id": "OQ-002",
+    },
+  ],
+}
+`;
+
+exports[`verification generators > generates deterministic traceability matrix payload 1`] = `
+{
+  "mappings": [
+    {
+      "output_reference": {
+        "output_document_ref": "machine_tsx_2320/TM",
+        "output_section_ref": "REQ:URS-001",
+        "template_doc_type": "TM",
+      },
+      "req_id": "URS-001",
+      "risk_ids": [
+        "RA-001",
+      ],
+      "test_ids": [
+        "IOQ-001",
+        "OQ-001",
+      ],
+    },
+    {
+      "output_reference": {
+        "output_document_ref": "machine_tsx_2320/TM",
+        "output_section_ref": "REQ:URS-002",
+        "template_doc_type": "TM",
+      },
+      "req_id": "URS-002",
+      "risk_ids": [
+        "RA-002",
+      ],
+      "test_ids": [
+        "IOQ-004",
+        "IOQ-005",
+        "OQ-002",
+      ],
+    },
+  ],
+  "metadata": {
+    "doc_type": "TM",
+    "doc_version": "v1",
+    "equipment_id": "machine_tsx_2320",
+    "generated_at": "2026-02-17T10:00:00.000Z",
+    "generated_by": "andrew@qa.org",
+    "system_name": "TSX2320FA20",
+  },
+  "revision_history": [
+    {
+      "change_summary": "Initial traceability matrix generated from URS, RA, IOQ, and OQ.",
+      "changed_at": "2026-02-17T10:00:00.000Z",
+      "changed_by": "andrew@qa.org",
+      "version": "v1.0",
+    },
+  ],
+}
+`;

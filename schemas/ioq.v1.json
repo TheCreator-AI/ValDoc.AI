@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://valdoc.ai/schemas/ioq.v1.json",
+  "title": "IOQ Protocol v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["metadata", "revision_history", "test_cases"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["doc_type", "doc_version", "system_name", "equipment_id", "generated_at", "generated_by"],
+      "properties": {
+        "doc_type": { "const": "IOQ" },
+        "doc_version": { "type": "string", "pattern": "^v[0-9]+(\\.[0-9]+)?$" },
+        "system_name": { "type": "string", "minLength": 1 },
+        "equipment_id": { "type": "string", "minLength": 1 },
+        "generated_at": { "type": "string", "format": "date-time" },
+        "generated_by": { "type": "string", "minLength": 1 }
+      }
+    },
+    "revision_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["version", "changed_at", "changed_by", "change_summary"],
+        "properties": {
+          "version": { "type": "string", "minLength": 1 },
+          "changed_at": { "type": "string", "format": "date-time" },
+          "changed_by": { "type": "string", "minLength": 1 },
+          "change_summary": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "test_cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "test_id",
+          "objective",
+          "prerequisites",
+          "steps",
+          "expected_results",
+          "evidence_required",
+          "pass_fail",
+          "linked_req_ids",
+          "linked_risk_ids"
+        ],
+        "properties": {
+          "test_id": { "type": "string", "minLength": 1 },
+          "objective": { "type": "string", "minLength": 1 },
+          "prerequisites": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "steps": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "expected_results": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "evidence_required": { "type": "string", "minLength": 1 },
+          "pass_fail": { "enum": ["PASS", "FAIL", "PENDING", "NA"] },
+          "linked_req_ids": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "linked_risk_ids": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

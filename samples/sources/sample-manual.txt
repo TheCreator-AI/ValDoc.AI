@@ -1,0 +1,17 @@
+# Sample Equipment Manual
+
+Intended use: The BRX-500 bioreactor is designed for sterile cell culture operations in GMP facilities.
+
+Core functions include mixing, heating, cooling, and agitation.
+
+Utilities: steam, purified water, compressed air, and electrical power.
+
+Safety features: emergency stop, alarm management, and software interlock handling.
+
+Sensors and Interfaces: temperature, pressure, flow, and pH sensors with OPC and Ethernet data interfaces.
+
+Software version: BRX Control v3.1.4.
+
+Process ranges:
+- Temperature 2 to 8 C
+- Pressure 1 to 2 bar

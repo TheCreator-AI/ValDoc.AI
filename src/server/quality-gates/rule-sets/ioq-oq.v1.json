@@ -1,0 +1,10 @@
+{
+  "docType": "IOQ_OQ",
+  "version": "v1",
+  "rules": [
+    "TEST_CASES_MISSING",
+    "TEST_STEPS_REQUIRED",
+    "TEST_EXPECTED_RESULTS_REQUIRED",
+    "TEST_TRACE_LINK_REQUIRED"
+  ]
+}

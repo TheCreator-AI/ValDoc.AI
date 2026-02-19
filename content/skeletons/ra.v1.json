@@ -1,0 +1,70 @@
+{
+  "doc_type": "RA",
+  "version": "v1",
+  "sections": [
+    {
+      "id": "purpose",
+      "order": 1,
+      "heading": "Purpose",
+      "populate_from": ["metadata.system_name", "metadata.equipment_id"],
+      "layout": "text"
+    },
+    {
+      "id": "risk_methodology",
+      "order": 2,
+      "heading": "Risk Methodology",
+      "populate_from": ["metadata.doc_version"],
+      "layout": "text"
+    },
+    {
+      "id": "risk_register",
+      "order": 3,
+      "heading": "Risk Register",
+      "populate_from": ["risks[]"],
+      "layout": "table",
+      "table_layout": {
+        "columns": [
+          "risk_id",
+          "hazard",
+          "cause",
+          "impact",
+          "severity",
+          "occurrence",
+          "detection",
+          "initial_risk",
+          "controls",
+          "residual_risk",
+          "linked_req_ids",
+          "verification_test_ids"
+        ]
+      }
+    },
+    {
+      "id": "risk_summary",
+      "order": 4,
+      "heading": "Risk Summary",
+      "populate_from": ["risks[].residual_risk"],
+      "layout": "text"
+    },
+    {
+      "id": "revision_history",
+      "order": 5,
+      "heading": "Revision History",
+      "populate_from": ["revision_history[]"],
+      "layout": "table",
+      "table_layout": {
+        "columns": ["version", "changed_at", "changed_by", "change_summary"]
+      }
+    },
+    {
+      "id": "approvals_signatures",
+      "order": 6,
+      "heading": "Approvals and Signatures",
+      "populate_from": ["approvals[]", "signatures[]"],
+      "layout": "table",
+      "table_layout": {
+        "columns": ["role", "name", "date", "signature_status"]
+      }
+    }
+  ]
+}

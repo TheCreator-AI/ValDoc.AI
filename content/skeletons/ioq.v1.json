@@ -1,0 +1,66 @@
+{
+  "doc_type": "IOQ",
+  "version": "v1",
+  "sections": [
+    {
+      "id": "purpose",
+      "order": 1,
+      "heading": "Purpose",
+      "populate_from": ["metadata.system_name", "metadata.equipment_id"],
+      "layout": "text"
+    },
+    {
+      "id": "prerequisites",
+      "order": 2,
+      "heading": "Prerequisites",
+      "populate_from": ["test_cases[].prerequisites"],
+      "layout": "checklist"
+    },
+    {
+      "id": "test_cases",
+      "order": 3,
+      "heading": "Test Cases",
+      "populate_from": ["test_cases[]"],
+      "layout": "table",
+      "table_layout": {
+        "columns": [
+          "test_id",
+          "objective",
+          "steps",
+          "expected_results",
+          "evidence_required",
+          "pass_fail",
+          "linked_req_ids",
+          "linked_risk_ids"
+        ]
+      }
+    },
+    {
+      "id": "execution_summary",
+      "order": 4,
+      "heading": "Execution Summary",
+      "populate_from": ["test_cases[].pass_fail"],
+      "layout": "text"
+    },
+    {
+      "id": "revision_history",
+      "order": 5,
+      "heading": "Revision History",
+      "populate_from": ["revision_history[]"],
+      "layout": "table",
+      "table_layout": {
+        "columns": ["version", "changed_at", "changed_by", "change_summary"]
+      }
+    },
+    {
+      "id": "approvals_signatures",
+      "order": 6,
+      "heading": "Approvals and Signatures",
+      "populate_from": ["approvals[]", "signatures[]"],
+      "layout": "table",
+      "table_layout": {
+        "columns": ["role", "name", "date", "signature_status"]
+      }
+    }
+  ]
+}

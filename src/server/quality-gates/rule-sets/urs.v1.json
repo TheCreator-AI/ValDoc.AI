@@ -1,0 +1,12 @@
+{
+  "docType": "URS",
+  "version": "v1",
+  "rules": [
+    "URS_REQ_ID_MISSING",
+    "URS_STATEMENT_SHALL_REQUIRED",
+    "URS_ACCEPTANCE_REQUIRED",
+    "URS_TEST_METHOD_REQUIRED",
+    "URS_CRITICALITY_REQUIRED",
+    "URS_FACT_SOURCE_REQUIRED"
+  ]
+}

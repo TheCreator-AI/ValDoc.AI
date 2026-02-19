@@ -1,0 +1,14 @@
+title = "ValDoc.AI gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Non-secret fixtures and generated files."
+paths = [
+  '''^prisma/dev\.db$''',
+  '''^node_modules/''',
+  '''^coverage/''',
+  '''^\.next/'''
+]
+
