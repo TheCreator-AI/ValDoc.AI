@@ -98,6 +98,18 @@ describe("EnterpriseWorkspace facts folder", () => {
           }
         });
       }
+      if (url.endsWith("/api/admin/security-status")) {
+        return jsonResponse({
+          serverTimeUtc: "2026-02-18T00:00:00.000Z",
+          organizationName: "QA Org",
+          controls: {
+            privilegedMfa: { required: true },
+            twoPersonRule: { enforced: true },
+            auditChain: { headPresent: true },
+            auditSink: { enabled: true, required: false, targetHost: "siem.example.com" }
+          }
+        });
+      }
       return jsonResponse({ error: "Not found" }, 404);
     });
   });
@@ -174,6 +186,9 @@ describe("EnterpriseWorkspace facts folder", () => {
     expect(screen.queryByText("1. Equipment Scope")).not.toBeInTheDocument();
     expect(screen.queryByText("2. Units and Governing Documents")).not.toBeInTheDocument();
     expect(screen.queryByText("3. Unit Records and Documents")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "View Equipment and Units" }));
+    expect(await screen.findByText("Security Posture")).toBeInTheDocument();
+    expect(screen.getByText("Privileged MFA: Required")).toBeInTheDocument();
   }, 15000);
 
   it("shows session loading screen before auth check completes", async () => {

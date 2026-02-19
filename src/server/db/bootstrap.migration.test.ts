@@ -30,5 +30,10 @@ describe("migration bootstrap", () => {
     expect(calls.some((statement) => statement.includes("CREATE TABLE IF NOT EXISTS \"AuditChainHead\""))).toBe(true);
     expect(calls.some((statement) => statement.includes("CREATE TRIGGER \"AuditEventDetail_no_update\""))).toBe(true);
     expect(calls.some((statement) => statement.includes("CREATE TRIGGER \"AuditEventDetail_no_delete\""))).toBe(true);
+    expect(calls.some((statement) => statement.includes("CREATE TRIGGER \"ElectronicSignature_no_update\""))).toBe(true);
+    expect(calls.some((statement) => statement.includes("CREATE TRIGGER \"ElectronicSignature_no_delete\""))).toBe(true);
+    expect(calls.some((statement) => statement.includes("CREATE TRIGGER \"DocumentVersion_no_delete\""))).toBe(true);
+    expect(calls.some((statement) => statement.includes("CREATE TRIGGER \"AppRelease_no_update_after_signature\""))).toBe(true);
+    expect(calls.some((statement) => statement.includes("CREATE TRIGGER \"AppRelease_no_delete\""))).toBe(true);
   });
 });

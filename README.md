@@ -70,13 +70,22 @@ npm install
 
 2. Configure env
 ```bash
-cp .env.example .env.local
+cp .env.example .env
 ```
 Required variables:
 - `DATABASE_URL`
 - `JWT_SECRET`
 - `CUSTOMER_ID`
 - `ORG_NAME`
+
+Windows quick setup for persistent user-level vars:
+```powershell
+setx DATABASE_URL "file:./dev.db"
+setx JWT_SECRET "replace-with-32-plus-char-random-secret"
+setx CUSTOMER_ID "amnion"
+setx ORG_NAME "Amnion"
+```
+After `setx`, close and reopen terminal.
 
 3. Generate Prisma client
 ```bash
@@ -117,18 +126,19 @@ Optional local seeded demo user (if `npm run db:seed`):
 - `andrew@qa.org` / `Password123!` (ADMIN)
 
 ## Full Tutorial
-1. Select organization + sign in as `andrew@qa.org`.
-2. Create a machine in **Equipment Scope**.
-3. Upload one or more files via drag-and-drop (manual, SOP, template, etc.).
-4. Click **Process upload** to parse and index source chunks.
-5. Click **Generate Pre-Execution (URS to IOQ)**.
-6. After protocol execution evidence is uploaded, click **Generate Post-Execution Summaries**.
-6. In **Review and Export**:
+1. On login, organization list is environment-driven for single-tenant deployments (`CUSTOMER_ID` / `ORG_NAME`).
+2. Sign in as admin user.
+3. Create a machine in **Equipment Scope**.
+4. Upload one or more files via drag-and-drop (manual, SOP, template, etc.).
+5. Click **Process upload** to parse and index source chunks.
+6. Click **Generate Pre-Execution (URS to IOQ)**.
+7. After protocol execution evidence is uploaded, click **Generate Post-Execution Summaries**.
+8. In **Review and Export**:
 - open generated docs
 - edit content
 - save a new version
 - approve/reject as reviewer
-7. Download:
+9. Download:
 - per-document DOCX/PDF
 - full package ZIP
 
@@ -155,6 +165,7 @@ Optional local seeded demo user (if `npm run db:seed`):
 - `GET/POST /api/admin/organizations`
 - `DELETE /api/admin/organizations/{organizationId}`
 - `GET /api/admin/system-time-status`
+- `GET /api/admin/security-status`
 - `POST /api/admin/evidence/export?date_from&date_to`
 - `GET/POST /api/admin/releases`
 - `PATCH /api/admin/releases/{releaseId}`
@@ -168,6 +179,7 @@ Optional local seeded demo user (if `npm run db:seed`):
 - `GET /api/export/{jobId}?format=zip|docx|pdf`
 
 Full endpoint notes: `docs/api-definitions.md`.
+Production deployment controls: `docs/production-hardening-checklist.md`.
 
 ## Testing and Quality Gates
 Run all checks:

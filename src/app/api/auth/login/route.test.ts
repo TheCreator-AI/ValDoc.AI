@@ -1,19 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { findUnique, findFirst, update, createSession, compare, signSessionToken, writeAuditEvent } = vi.hoisted(() => ({
+const { findUnique, findFirst, upsertOrganization, update, createSession, compare, signSessionToken, writeAuditEvent, checkAndConsumeRateLimit } = vi.hoisted(() => ({
   findUnique: vi.fn(),
   findFirst: vi.fn(),
+  upsertOrganization: vi.fn(),
   update: vi.fn(),
   createSession: vi.fn(),
   compare: vi.fn(),
   signSessionToken: vi.fn(),
-  writeAuditEvent: vi.fn()
+  writeAuditEvent: vi.fn(),
+  checkAndConsumeRateLimit: vi.fn()
 }));
 
 vi.mock("@/server/db/prisma", () => ({
   prisma: {
     user: { findUnique, update },
-    organization: { findFirst },
+    organization: { findFirst, upsert: upsertOrganization },
     userSession: { create: createSession },
     $executeRawUnsafe: vi.fn()
   }
@@ -31,6 +33,10 @@ vi.mock("@/server/audit/events", () => ({
   writeAuditEvent
 }));
 
+vi.mock("@/server/security/rateLimit", () => ({
+  checkAndConsumeRateLimit
+}));
+
 vi.mock("@/server/auth/systemOwner", () => ({
   isSystemOwnerEmail: vi.fn((email: string) => email.toLowerCase() === "aphvaldoc@gmail.com")
 }));
@@ -40,8 +46,10 @@ import { POST } from "./route";
 describe("POST /api/auth/login", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    checkAndConsumeRateLimit.mockReturnValue({ allowed: true, remaining: 11, retryAfterSeconds: 0 });
     writeAuditEvent.mockResolvedValue(undefined);
     findFirst.mockResolvedValue({ id: "org_qa", name: "QA Org", isActive: true });
+    upsertOrganization.mockResolvedValue({ id: "org_qa", name: "QA Org", isActive: true });
     createSession.mockResolvedValue({ id: "sess_1" });
     update.mockResolvedValue(undefined);
   });
@@ -58,6 +66,19 @@ describe("POST /api/auth/login", () => {
     const response = await POST(request);
     expect(response.status).toBe(401);
     expect(writeAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it("returns 429 when auth rate limit is exceeded", async () => {
+    checkAndConsumeRateLimit.mockReturnValueOnce({ allowed: false, remaining: 0, retryAfterSeconds: 45 });
+    const response = await POST(
+      new Request("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: "org_qa", email: "andrew@qa.org", password: "bad" })
+      })
+    );
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("45");
   });
 
   it("returns warning attempts remaining when <= 3", async () => {
@@ -237,6 +258,45 @@ describe("POST /api/auth/login", () => {
     env.REQUIRE_ADMIN_MFA = previous;
   });
 
+  it("enforces privileged MFA for approver in production by default", async () => {
+    const env = process.env as Record<string, string | undefined>;
+    const previousNodeEnv = env.NODE_ENV;
+    const previousPrivilegedMfa = env.REQUIRE_PRIVILEGED_MFA;
+    env.NODE_ENV = "production";
+    delete env.REQUIRE_PRIVILEGED_MFA;
+
+    findUnique.mockResolvedValueOnce({
+      id: "u2",
+      email: "approver@qa.org",
+      organizationId: "org_qa",
+      fullName: "Approver",
+      role: "APPROVER",
+      userStatus: "ACTIVE",
+      failedLoginAttempts: 0,
+      passwordUpdatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      mfaEnabled: false,
+      passwordHash: "hash"
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: "org_qa", email: "approver@qa.org", password: "Password123!" })
+      })
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({ mfaRequired: true }));
+
+    env.NODE_ENV = previousNodeEnv;
+    if (previousPrivilegedMfa === undefined) {
+      delete env.REQUIRE_PRIVILEGED_MFA;
+    } else {
+      env.REQUIRE_PRIVILEGED_MFA = previousPrivilegedMfa;
+    }
+  });
+
   it("returns user and sets cookie for valid credentials", async () => {
     findUnique.mockResolvedValueOnce({
       id: "u1",
@@ -390,5 +450,49 @@ describe("POST /api/auth/login", () => {
         organizationId: "org_amnion"
       })
     );
+  });
+
+  it("auto-provisions deployment org during login when selected org matches CUSTOMER_ID", async () => {
+    const env = process.env as Record<string, string | undefined>;
+    const prevCustomer = env.CUSTOMER_ID;
+    const prevOrgName = env.ORG_NAME;
+    env.CUSTOMER_ID = "amnion";
+    env.ORG_NAME = "Amnion";
+
+    findUnique.mockResolvedValueOnce({
+      id: "u-master",
+      email: "aphvaldoc@gmail.com",
+      organizationId: "org_qa",
+      fullName: "Platform Admin",
+      role: "ADMIN",
+      userStatus: "ACTIVE",
+      failedLoginAttempts: 0,
+      passwordUpdatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      mfaEnabled: true,
+      passwordHash: "hash"
+    });
+    findFirst.mockResolvedValueOnce(null);
+    upsertOrganization.mockResolvedValueOnce({ id: "amnion", name: "Amnion", isActive: true });
+    compare.mockResolvedValueOnce(true);
+    signSessionToken.mockResolvedValueOnce("signed-token");
+
+    const response = await POST(
+      new Request("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: "amnion", email: "aphvaldoc@gmail.com", password: "Password123!" })
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(upsertOrganization).toHaveBeenCalledWith({
+      where: { id: "amnion" },
+      update: { name: "Amnion", isActive: true },
+      create: { id: "amnion", name: "Amnion", isActive: true },
+      select: { id: true, name: true }
+    });
+
+    env.CUSTOMER_ID = prevCustomer;
+    env.ORG_NAME = prevOrgName;
   });
 });

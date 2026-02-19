@@ -15,7 +15,7 @@ Provide end-to-end user instructions for operating ValDoc.AI across setup, docum
 
 ## 3. Sign In and Session Basics
 1. Open the application URL.
-2. Select organization (if prompted).
+2. Confirm the organization dropdown shows the deployment org (single-tenant mode).
 3. Enter credentials and sign in.
 4. If login failures occur, warnings appear near lockout threshold.
 5. Use Sign Out after completion.
@@ -75,6 +75,7 @@ Provide end-to-end user instructions for operating ValDoc.AI across setup, docum
 ## 12. Troubleshooting
 - `403 Insufficient permissions`: confirm role assignment and organization context.
 - `401 Authentication required`: sign in again or check session timeout.
+- `500 HTTP` on login: check environment config (`DATABASE_URL`, `JWT_SECRET`, `CUSTOMER_ID`, `ORG_NAME`) and restart service.
 - Upload rejection: verify allowed file type and size.
 - Export errors: check document status and quality gate results.
 

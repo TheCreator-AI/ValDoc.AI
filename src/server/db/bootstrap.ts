@@ -138,6 +138,47 @@ export const ensureDatabaseInitialized = async () => {
       SELECT RAISE(ABORT, 'audit_event_details is append-only');
     END
   `);
+  await prismaWithRaw.$executeRawUnsafe("DROP TRIGGER IF EXISTS \"ElectronicSignature_no_update\"");
+  await prismaWithRaw.$executeRawUnsafe(`
+    CREATE TRIGGER "ElectronicSignature_no_update"
+    BEFORE UPDATE ON "ElectronicSignature"
+    BEGIN
+      SELECT RAISE(ABORT, 'electronic_signatures is append-only');
+    END
+  `);
+  await prismaWithRaw.$executeRawUnsafe("DROP TRIGGER IF EXISTS \"ElectronicSignature_no_delete\"");
+  await prismaWithRaw.$executeRawUnsafe(`
+    CREATE TRIGGER "ElectronicSignature_no_delete"
+    BEFORE DELETE ON "ElectronicSignature"
+    BEGIN
+      SELECT RAISE(ABORT, 'electronic_signatures is append-only');
+    END
+  `);
+  await prismaWithRaw.$executeRawUnsafe("DROP TRIGGER IF EXISTS \"DocumentVersion_no_delete\"");
+  await prismaWithRaw.$executeRawUnsafe(`
+    CREATE TRIGGER "DocumentVersion_no_delete"
+    BEFORE DELETE ON "DocumentVersion"
+    BEGIN
+      SELECT RAISE(ABORT, 'document_versions do not allow hard delete');
+    END
+  `);
+  await prismaWithRaw.$executeRawUnsafe("DROP TRIGGER IF EXISTS \"AppRelease_no_update_after_signature\"");
+  await prismaWithRaw.$executeRawUnsafe(`
+    CREATE TRIGGER "AppRelease_no_update_after_signature"
+    BEFORE UPDATE ON "AppRelease"
+    WHEN OLD."approvedSignatureId" IS NOT NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'signed app_release records are immutable');
+    END
+  `);
+  await prismaWithRaw.$executeRawUnsafe("DROP TRIGGER IF EXISTS \"AppRelease_no_delete\"");
+  await prismaWithRaw.$executeRawUnsafe(`
+    CREATE TRIGGER "AppRelease_no_delete"
+    BEFORE DELETE ON "AppRelease"
+    BEGIN
+      SELECT RAISE(ABORT, 'app_release records do not allow hard delete');
+    END
+  `);
   await prismaWithRaw.$executeRawUnsafe("DROP INDEX IF EXISTS \"DocumentTemplate_organizationId_docType_key\"");
   await prismaWithRaw.$executeRawUnsafe("CREATE UNIQUE INDEX IF NOT EXISTS \"DocumentTemplate_organizationId_templateId_version_key\" ON \"DocumentTemplate\"(\"organizationId\", \"templateId\", \"version\")");
   await prismaWithRaw.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS \"DocumentTemplate_organizationId_docType_status_approvedAt_idx\" ON \"DocumentTemplate\"(\"organizationId\", \"docType\", \"status\", \"approvedAt\")");

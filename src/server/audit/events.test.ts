@@ -4,13 +4,18 @@ const mocks = vi.hoisted(() => ({
   createAuditEvent: vi.fn(),
   findChainHead: vi.fn(),
   upsertChainHead: vi.fn(),
-  tx: vi.fn()
+  tx: vi.fn(),
+  emitAuditEventToSink: vi.fn()
 }));
 
 vi.mock("@/server/db/prisma", () => ({
   prisma: {
     $transaction: mocks.tx
   }
+}));
+
+vi.mock("@/server/audit/sink", () => ({
+  emitAuditEventToSink: mocks.emitAuditEventToSink
 }));
 
 import { writeAuditEvent } from "@/server/audit/events";
@@ -21,6 +26,7 @@ describe("writeAuditEvent", () => {
     mocks.findChainHead.mockResolvedValue(null);
     mocks.upsertChainHead.mockResolvedValue({ organizationId: "org1", headHash: "head" });
     mocks.createAuditEvent.mockResolvedValue({ id: "a1" });
+    mocks.emitAuditEventToSink.mockResolvedValue({ forwarded: true });
     mocks.tx.mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) =>
       cb({
         auditEvent: { create: mocks.createAuditEvent },
@@ -55,6 +61,26 @@ describe("writeAuditEvent", () => {
       })
     );
     expect(mocks.upsertChainHead).toHaveBeenCalled();
+  });
+
+  it("forwards persisted audit events to external sink", async () => {
+    await writeAuditEvent({
+      organizationId: "org1",
+      actorUserId: "u1",
+      action: "template.create",
+      entityType: "DocumentTemplate",
+      entityId: "t1"
+    });
+
+    expect(mocks.emitAuditEventToSink).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: "a1",
+        organizationId: "org1",
+        action: "template.create",
+        eventHash: expect.any(String),
+        prevHash: expect.any(String)
+      })
+    );
   });
 
   it("writes denied outcome when specified", async () => {

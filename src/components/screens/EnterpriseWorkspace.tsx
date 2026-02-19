@@ -145,6 +145,17 @@ type SystemTimeStatus = {
   };
 };
 
+type SecurityStatus = {
+  serverTimeUtc: string;
+  organizationName: string;
+  controls: {
+    privilegedMfa: { required: boolean };
+    twoPersonRule: { enforced: boolean };
+    auditChain: { headPresent: boolean };
+    auditSink: { enabled: boolean; required: boolean; targetHost: string | null };
+  };
+};
+
 type LoginOrganization = {
   id: string;
   name: string;
@@ -397,6 +408,7 @@ export default function EnterpriseWorkspace() {
   const [auditEvents, setAuditEvents] = useState<AuditEventItem[]>([]);
   const [auditChainVerification, setAuditChainVerification] = useState<AuditChainVerification | null>(null);
   const [systemTimeStatus, setSystemTimeStatus] = useState<SystemTimeStatus | null>(null);
+  const [securityStatus, setSecurityStatus] = useState<SecurityStatus | null>(null);
   const [auditFilters, setAuditFilters] = useState({
     action: "",
     entityType: "",
@@ -455,6 +467,16 @@ export default function EnterpriseWorkspace() {
       setSystemTimeStatus(status);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Failed to load system time status.");
+    }
+  }, [user?.role]);
+
+  const refreshSecurityStatus = useCallback(async () => {
+    if (user?.role !== "ADMIN") return;
+    try {
+      const status = await callApi<SecurityStatus>("/api/admin/security-status");
+      setSecurityStatus(status);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Failed to load security posture.");
     }
   }, [user?.role]);
 
@@ -602,7 +624,8 @@ export default function EnterpriseWorkspace() {
     if (user?.role !== "ADMIN") return;
     refreshAuditEvents().catch(() => undefined);
     refreshSystemTimeStatus().catch(() => undefined);
-  }, [user?.role, refreshAuditEvents, refreshSystemTimeStatus]);
+    refreshSecurityStatus().catch(() => undefined);
+  }, [user?.role, refreshAuditEvents, refreshSystemTimeStatus, refreshSecurityStatus]);
 
   useEffect(() => {
     const loadUnitExecutedDocs = async () => {
@@ -630,6 +653,12 @@ export default function EnterpriseWorkspace() {
     setTemplateUploadStates([]);
     setTemplateSuggestions([]);
   }, [templateDocType]);
+
+  useEffect(() => {
+    if (!selectedLoginOrganizationId && loginOrganizations.length === 1) {
+      setSelectedLoginOrganizationId(loginOrganizations[0]?.id ?? "");
+    }
+  }, [loginOrganizations, selectedLoginOrganizationId]);
 
   const templatesByDocType = useMemo(() => {
     return templates.reduce<Record<string, DocumentTemplate[]>>((acc, template) => {
@@ -1311,17 +1340,13 @@ const deleteTemplate = async (templateId: string) => {
       <main className="page">
         <section className="panel authPanel">
           <h1>ValDoc.AI Enterprise Login</h1>
-          <p>Multi-tenant access with organization-level data isolation.</p>
-          <label htmlFor="organization-select">Organization</label>
           <select
             id="organization-select"
             aria-label="Organization"
             value={selectedLoginOrganizationId}
             onChange={(event) => setSelectedLoginOrganizationId(event.target.value)}
           >
-            <option value="">
-              {loginOrganizations.length === 0 ? "No organizations available" : "Select organization"}
-            </option>
+            {loginOrganizations.length === 0 ? <option value="">No organizations available</option> : null}
             {loginOrganizations.map((org) => (
               <option key={org.id} value={org.id}>
                 {org.name}
@@ -1830,6 +1855,25 @@ const deleteTemplate = async (templateId: string) => {
               </>
             ) : (
               <p>System time status unavailable.</p>
+            )}
+          </div>
+          <div className="docCard auditTimeStatus">
+            <p><strong>Security Posture</strong></p>
+            <button onClick={refreshSecurityStatus}>Refresh Security Status</button>
+            {securityStatus ? (
+              <>
+                <p>Privileged MFA: {securityStatus.controls.privilegedMfa.required ? "Required" : "Optional"}</p>
+                <p>Two-Person Rule: {securityStatus.controls.twoPersonRule.enforced ? "Enforced" : "Disabled"}</p>
+                <p>Audit Chain Head: {securityStatus.controls.auditChain.headPresent ? "Present" : "Missing"}</p>
+                <p>
+                  Audit Sink: {securityStatus.controls.auditSink.enabled ? "Enabled" : "Disabled"}
+                  {securityStatus.controls.auditSink.enabled
+                    ? ` (${securityStatus.controls.auditSink.targetHost ?? "unknown host"})`
+                    : ""}
+                </p>
+              </>
+            ) : (
+              <p>Security posture unavailable.</p>
             )}
           </div>
           <div className="row auditFiltersRow">

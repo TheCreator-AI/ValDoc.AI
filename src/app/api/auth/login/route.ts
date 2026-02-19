@@ -7,6 +7,7 @@ import { ensureDatabaseInitialized } from "@/server/db/bootstrap";
 import { writeAuditEvent } from "@/server/audit/events";
 import { isSystemOwnerEmail } from "@/server/auth/systemOwner";
 import { getAuthPolicy } from "@/server/auth/policy";
+import { checkAndConsumeRateLimit } from "@/server/security/rateLimit";
 
 const getClientIp = (request: Request) => {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -30,15 +31,43 @@ export async function POST(request: Request) {
     return apiJson(400, { error: "Organization, email, and password are required." });
   }
 
+  const clientIp = getClientIp(request) ?? "unknown";
+  const rateLimit = checkAndConsumeRateLimit({
+    key: `auth:login:${clientIp}:${body.email.toLowerCase()}`,
+    limit: 12,
+    windowMs: 5 * 60 * 1000
+  });
+  if (!rateLimit.allowed) {
+    return new Response(JSON.stringify({ error: "Too many login attempts. Please retry later." }), {
+      status: 429,
+      headers: {
+        "Content-Type": "application/json",
+        "Retry-After": String(rateLimit.retryAfterSeconds)
+      }
+    });
+  }
+
   const user = await prisma.user.findUnique({ where: { email: body.email } });
   if (!user) {
     return apiJson(401, { error: "Invalid credentials." });
   }
 
-  const targetOrganization = await prisma.organization.findFirst({
+  let targetOrganization = await prisma.organization.findFirst({
     where: { id: body.organizationId, isActive: true },
     select: { id: true, name: true }
   });
+  if (!targetOrganization) {
+    const customerId = (process.env.CUSTOMER_ID ?? "").trim();
+    const orgName = (process.env.ORG_NAME ?? "").trim();
+    if (customerId && orgName && body.organizationId === customerId) {
+      targetOrganization = await prisma.organization.upsert({
+        where: { id: customerId },
+        update: { name: orgName, isActive: true },
+        create: { id: customerId, name: orgName, isActive: true },
+        select: { id: true, name: true }
+      });
+    }
+  }
   if (!targetOrganization) {
     return apiJson(404, { error: "Selected organization was not found or is inactive." });
   }
@@ -92,6 +121,24 @@ export async function POST(request: Request) {
       error: "Password expired. Reset your password before signing in.",
       passwordExpired: true,
       passwordMaxAgeDays: authPolicy.passwordMaxAgeDays
+    });
+  }
+
+  const privilegedRoles = new Set(["ADMIN", "APPROVER", "REVIEWER"]);
+  if (authPolicy.requirePrivilegedMfa && privilegedRoles.has(user.role) && !user.mfaEnabled) {
+    await writeAuditEvent({
+      organizationId: body.organizationId,
+      actorUserId: user.id,
+      action: "auth.login.failed",
+      entityType: "User",
+      entityId: user.id,
+      outcome: "DENIED",
+      details: { reason: "privileged_mfa_required", email: user.email, role: user.role },
+      request
+    }).catch(() => undefined);
+    return apiJson(403, {
+      error: "MFA is required for privileged roles in this deployment.",
+      mfaRequired: true
     });
   }
 

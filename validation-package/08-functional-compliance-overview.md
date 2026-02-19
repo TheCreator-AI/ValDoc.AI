@@ -8,7 +8,7 @@ Status: `Controlled`
 Provide a consolidated description of platform functionality and explain the controls that support compliant operation in regulated workflows.
 
 ## 2. Functional Capabilities
-- Authentication and organization-scoped access control.
+- Authentication and deployment-organization-scoped access control (single-tenant per instance).
 - Role-based authorization for Admin/Author/Reviewer/Approver/Viewer operations.
 - Equipment and unit management, including grouped units and metadata.
 - Controlled upload and storage of templates, source documents, and executed documents.

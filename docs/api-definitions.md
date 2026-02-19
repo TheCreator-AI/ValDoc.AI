@@ -60,6 +60,11 @@ RBAC matrix:
   - Admin/audit.read only
   - returns server UTC time, app timezone config, and NTP sync status/assumption
 
+## Security Status
+- `GET /api/admin/security-status`
+  - Admin only (`organizations.manage`)
+  - returns summarized deployment hardening posture (MFA requirement, two-person rule, audit chain head presence, audit sink configuration status)
+
 ## Retention and Legal Hold
 - `GET /api/admin/retention/config`
 - `PUT /api/admin/retention/config`

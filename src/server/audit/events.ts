@@ -1,6 +1,7 @@
 import { prisma } from "@/server/db/prisma";
 import type { FieldChange } from "@/server/audit/diff";
 import { computeEventHash, type AuditChainEventPayload } from "@/server/audit/chain";
+import { emitAuditEventToSink } from "@/server/audit/sink";
 
 const normalizeHeader = (value: string | null) => (value ? value.slice(0, 512) : null);
 
@@ -48,7 +49,7 @@ export const writeAuditEvent = async (params: {
 
   if (typeof prismaWithTx.$transaction !== "function") {
     const eventHash = computeEventHash("", payload);
-    await prisma.auditEvent.create({
+    const created = await prisma.auditEvent.create({
       data: {
         organizationId: params.organizationId,
         actorUserId: params.actorUserId,
@@ -74,10 +75,26 @@ export const writeAuditEvent = async (params: {
         userAgent
       }
     });
+    await emitAuditEventToSink({
+      eventId: created.id,
+      organizationId: params.organizationId,
+      actorUserId: params.actorUserId,
+      action: params.action,
+      entityType: params.entityType,
+      entityId: params.entityId,
+      outcome: params.outcome ?? "SUCCESS",
+      metadataJson: metadata,
+      detailsJson: metadata,
+      ip,
+      userAgent,
+      prevHash: "",
+      eventHash,
+      timestampIso: timestamp.toISOString()
+    });
     return;
   }
 
-  await prismaWithTx.$transaction(async (tx) => {
+  const created = await prismaWithTx.$transaction(async (tx) => {
     const chainHead = await tx.auditChainHead.findUnique({
       where: { organizationId: params.organizationId }
     });
@@ -122,6 +139,23 @@ export const writeAuditEvent = async (params: {
       }
     });
 
-    return created;
+    return { id: created.id, prevHash, eventHash };
+  });
+
+  await emitAuditEventToSink({
+    eventId: created.id,
+    organizationId: params.organizationId,
+    actorUserId: params.actorUserId,
+    action: params.action,
+    entityType: params.entityType,
+    entityId: params.entityId,
+    outcome: params.outcome ?? "SUCCESS",
+    metadataJson: metadata,
+    detailsJson: metadata,
+    ip,
+    userAgent,
+    prevHash: created.prevHash,
+    eventHash: created.eventHash,
+    timestampIso: timestamp.toISOString()
   });
 };
