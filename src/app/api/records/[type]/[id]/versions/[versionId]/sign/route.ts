@@ -58,7 +58,7 @@ export async function POST(
   context: { params: Promise<{ type: string; id: string; versionId: string }> }
 ) {
   const session = await getSessionOrThrow();
-  const rateLimit = checkAndConsumeRateLimit({
+  const rateLimit = await checkAndConsumeRateLimit({
     key: `signature:${session.organizationId}:${session.userId}`,
     limit: 20,
     windowMs: 10 * 60 * 1000

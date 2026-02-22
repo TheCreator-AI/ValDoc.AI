@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   try {
     const session = await getSessionOrThrow("ENGINEER");
     sessionRef = { organizationId: session.organizationId, userId: session.userId };
-    const rateLimit = checkAndConsumeRateLimit({
+    const rateLimit = await checkAndConsumeRateLimit({
       key: `upload:${session.organizationId}:${session.userId}`,
       limit: 60,
       windowMs: 10 * 60 * 1000

@@ -21,6 +21,7 @@ Operations:
 | `units.read` | Yes | Yes | Yes | Yes | Yes |
 | `units.write` | Yes | Yes | No | No | No |
 | `documents.generate` | Yes | Yes | No | No | No |
+| `documents.export` | Yes | Yes | Yes | Yes | Yes |
 | `audit.read` | Yes | No | No | No | No |
 | `users.manage_roles` | Yes | No | No | No | No |
 | `organizations.manage` | Yes | No | No | No | No |

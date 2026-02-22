@@ -79,6 +79,7 @@ describe("env config guard", () => {
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
         NODE_ENV: "production",
+        MALWARE_SCANNER_PROVIDER: "clamav",
         ENABLE_OPENSEARCH: "true",
         OPENSEARCH_SECURITY_DISABLED: "true"
       })
@@ -93,6 +94,7 @@ describe("env config guard", () => {
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
         NODE_ENV: "production",
+        MALWARE_SCANNER_PROVIDER: "clamav",
         ENABLE_OPENSEARCH: "true",
         OPENSEARCH_SECURITY_DISABLED: "false",
         OPENSEARCH_URL: "http://opensearch.internal:9200",
@@ -110,6 +112,7 @@ describe("env config guard", () => {
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
         NODE_ENV: "production",
+        MALWARE_SCANNER_PROVIDER: "clamav",
         ENABLE_OPENSEARCH: "true",
         OPENSEARCH_SECURITY_DISABLED: "false",
         OPENSEARCH_URL: "https://opensearch.internal:9200"
@@ -125,6 +128,7 @@ describe("env config guard", () => {
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
         NODE_ENV: "production",
+        MALWARE_SCANNER_PROVIDER: "clamav",
         BACKUP_ENCRYPTION_KEY: ""
       })
     ).toThrow(/BACKUP_ENCRYPTION_KEY/);
@@ -138,6 +142,7 @@ describe("env config guard", () => {
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
         NODE_ENV: "production",
+        MALWARE_SCANNER_PROVIDER: "clamav",
         BACKUP_ENCRYPTION_KEY: "changeme"
       })
     ).toThrow(/BACKUP_ENCRYPTION_KEY/);
@@ -164,10 +169,96 @@ describe("env config guard", () => {
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
         NODE_ENV: "production",
+        MALWARE_SCANNER_PROVIDER: "clamav",
         BACKUP_ENCRYPTION_KEY: "super-long-backup-encryption-key-0123456789",
+        RATE_LIMIT_BACKEND: "gateway",
         SESSION_MAX_AGE_SECONDS: "172801",
         SESSION_IDLE_TIMEOUT_SECONDS: "1800"
       })
     ).toThrow(/SESSION_MAX_AGE_SECONDS/);
+  });
+
+  it("rejects production startup when distributed rate limit backend is not configured", () => {
+    expect(() =>
+      validateStartupConfig({
+        DATABASE_URL: "file:./dev.db",
+        JWT_SECRET: "super-long-test-secret-0123456789",
+        CUSTOMER_ID: "qa-org",
+        ORG_NAME: "QA Organization",
+        NODE_ENV: "production",
+        MALWARE_SCANNER_PROVIDER: "clamav",
+        BACKUP_ENCRYPTION_KEY: "super-long-backup-encryption-key-0123456789",
+        RATE_LIMIT_BACKEND: "memory"
+      })
+    ).toThrow(/RATE_LIMIT_BACKEND/);
+  });
+
+  it("rejects production startup when default MinIO credentials are configured", () => {
+    expect(() =>
+      validateStartupConfig({
+        DATABASE_URL: "file:./dev.db",
+        JWT_SECRET: "super-long-test-secret-0123456789",
+        CUSTOMER_ID: "qa-org",
+        ORG_NAME: "QA Organization",
+        NODE_ENV: "production",
+        MALWARE_SCANNER_PROVIDER: "clamav",
+        BACKUP_ENCRYPTION_KEY: "super-long-backup-encryption-key-0123456789",
+        RATE_LIMIT_BACKEND: "gateway",
+        MINIO_ROOT_USER: "minioadmin",
+        MINIO_ROOT_PASSWORD: "minioadmin"
+      })
+    ).toThrow(/MinIO/);
+  });
+
+  it("accepts production startup when Redis rate limiting is configured securely", () => {
+    const logger = vi.fn();
+    validateStartupConfig(
+      {
+        DATABASE_URL: "file:./dev.db",
+        JWT_SECRET: "super-long-test-secret-0123456789",
+        CUSTOMER_ID: "qa-org",
+        ORG_NAME: "QA Organization",
+        NODE_ENV: "production",
+        MALWARE_SCANNER_PROVIDER: "clamav",
+        BACKUP_ENCRYPTION_KEY: "super-long-backup-encryption-key-0123456789",
+        RATE_LIMIT_BACKEND: "redis",
+        REDIS_REST_URL: "https://redis.example.com",
+        REDIS_REST_TOKEN: "super-long-redis-token-value-123456"
+      },
+      logger
+    );
+    expect(logger).toHaveBeenCalledWith(expect.stringContaining("Config validation executed"));
+  });
+
+  it("rejects production startup when malware scanner provider is stub", () => {
+    expect(() =>
+      validateStartupConfig({
+        DATABASE_URL: "file:./dev.db",
+        JWT_SECRET: "super-long-test-secret-0123456789",
+        CUSTOMER_ID: "qa-org",
+        ORG_NAME: "QA Organization",
+        NODE_ENV: "production",
+        BACKUP_ENCRYPTION_KEY: "super-long-backup-encryption-key-0123456789",
+        RATE_LIMIT_BACKEND: "gateway",
+        MALWARE_SCANNER_PROVIDER: "stub"
+      })
+    ).toThrow(/MALWARE_SCANNER_PROVIDER/);
+  });
+
+  it("rejects production startup when managed malware scanner is selected without endpoint/token", () => {
+    expect(() =>
+      validateStartupConfig({
+        DATABASE_URL: "file:./dev.db",
+        JWT_SECRET: "super-long-test-secret-0123456789",
+        CUSTOMER_ID: "qa-org",
+        ORG_NAME: "QA Organization",
+        NODE_ENV: "production",
+        BACKUP_ENCRYPTION_KEY: "super-long-backup-encryption-key-0123456789",
+        RATE_LIMIT_BACKEND: "gateway",
+        MALWARE_SCANNER_PROVIDER: "managed",
+        MANAGED_MALWARE_SCAN_URL: "",
+        MANAGED_MALWARE_SCAN_TOKEN: ""
+      })
+    ).toThrow(/MANAGED_MALWARE_SCAN/);
   });
 });

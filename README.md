@@ -218,11 +218,32 @@ Run all security gates together:
 npm run security:check
 ```
 
+Scheduled audit-chain verification control (for daily/weekly scheduler):
+```bash
+npm run audit:verify-chain:scheduled -- --lookback-days=1
+```
+- Generates and stores a signed verification report.
+- Writes run summary log under `storage/logs/`.
+
 CI build evidence:
 - Every CI run uploads artifact `build-evidence-<run_id>` containing:
   - `build-evidence.md` (gate outcomes + policy)
   - `npm-audit.json`
   - `sbom.cdx.json`
+
+Release-ready Evidence Pack scaffold:
+```bash
+npm run evidence:pack -- --version=0.1.0 --date=2026-02-22 --env=staging
+```
+- Output folder pattern: `evidence-packs/ValDocAI_EvidencePack_vX.Y.Z_YYYY-MM-DD/`
+- Re-run this command for each release to refresh placeholders and checksums.
+- Fill each placeholder file with current run artifacts (scan outputs, test logs, screenshots, chain reports, etc.).
+
+Capture tenant isolation test output directly into the latest evidence pack:
+```bash
+npm run evidence:tenant-isolation
+```
+- Writes to: `05-Tenant-Isolation-Proof/run_output.txt`
 
 Config validation command:
 ```bash

@@ -26,7 +26,7 @@ const parseDateRange = (request: Request) => {
 export async function POST(request: Request) {
   try {
     const session = await getSessionOrThrow("ADMIN");
-    const rateLimit = checkAndConsumeRateLimit({
+    const rateLimit = await checkAndConsumeRateLimit({
       key: `evidence-export:${session.organizationId}:${session.userId}`,
       limit: 10,
       windowMs: 10 * 60 * 1000

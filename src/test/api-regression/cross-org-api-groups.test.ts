@@ -37,7 +37,8 @@ const mocks = vi.hoisted(() => ({
   parseUrsRequirementsFromContent: vi.fn(),
   writeAuditEvent: vi.fn(),
   auditEventFindMany: vi.fn(),
-  auditChainHeadFindUnique: vi.fn()
+  auditChainHeadFindUnique: vi.fn(),
+  searchChunks: vi.fn()
 }));
 
 vi.mock("bcryptjs", () => ({
@@ -148,6 +149,10 @@ vi.mock("@/server/audit/events", () => ({
   writeAuditEvent: mocks.writeAuditEvent
 }));
 
+vi.mock("@/server/search/indexer", () => ({
+  searchChunks: mocks.searchChunks
+}));
+
 import { GET as machinesGet } from "@/app/api/machines/route";
 import { GET as jobsGet } from "@/app/api/jobs/route";
 import { POST as generationStartPost } from "@/app/api/generation/start/route";
@@ -166,6 +171,7 @@ import { POST as transitionPost } from "@/app/api/documents/[id]/versions/[versi
 import { POST as signaturePost } from "@/app/api/records/[type]/[id]/versions/[versionId]/sign/route";
 import { GET as exportGet } from "@/app/api/export/[jobId]/route";
 import { GET as auditVerifyGet } from "@/app/api/admin/audit/verify-chain/route";
+import { GET as searchGet } from "@/app/api/search/route";
 
 describe("cross-organization route-group coverage", () => {
   beforeEach(() => {
@@ -187,6 +193,7 @@ describe("cross-organization route-group coverage", () => {
     mocks.auditChainHeadFindUnique.mockResolvedValue({ headHash: "" });
     mocks.generatedDocumentFindMany.mockResolvedValue([]);
     mocks.traceabilityFindMany.mockResolvedValue([]);
+    mocks.searchChunks.mockResolvedValue([]);
   });
 
   it("does not leak cross-org objects on list endpoints", async () => {
@@ -358,5 +365,11 @@ describe("cross-organization route-group coverage", () => {
     expect(mocks.auditEventFindMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { organizationId: "org_a" } })
     );
+  });
+
+  it("uses organization-scoped search queries", async () => {
+    const response = await searchGet(new Request("http://localhost/api/search?q=temperature"));
+    expect(response.status).toBe(200);
+    expect(mocks.searchChunks).toHaveBeenCalledWith("org_a", "temperature");
   });
 });

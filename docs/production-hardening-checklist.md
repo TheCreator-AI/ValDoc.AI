@@ -17,7 +17,9 @@ Deployment controls required in addition to application code for GMP/Part 11-ali
 ## App Security Controls
 - CSRF same-origin guard enabled for unsafe authenticated API methods.
 - Rate limiting enabled for login, signing, uploads, and evidence export.
+- Use distributed rate limiting in production (`RATE_LIMIT_BACKEND=redis`) or enforce equivalent controls at API gateway/WAF.
 - Secure response headers enabled (CSP, X-Frame-Options, nosniff, etc.).
+- Startup config validation blocks insecure OpenSearch flags and default MinIO credentials in production.
 
 ## Secrets and Keys
 - Store secrets in a managed secret store/KMS.

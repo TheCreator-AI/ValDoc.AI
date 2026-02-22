@@ -12,6 +12,7 @@ Primary suites:
 Covered route groups from `docs/api-definitions.md`:
 - Equipment and uploads:
   - `GET /api/machines` (list scoped)
+  - `GET /api/search?q=...` (search scoped to caller org)
 - Generation:
   - `POST /api/generation/start` (cross-org machine -> 404)
   - `GET /api/generation/{jobId}` (cross-org job -> 404)

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "@/server/api/http";
 
 const mocks = vi.hoisted(() => ({
-  getSessionOrThrow: vi.fn(),
+  getSessionOrThrowWithPermission: vi.fn(),
   exportJobAsZip: vi.fn(),
   exportDocumentAsPdfWithMetadata: vi.fn(),
   exportDocumentAsDocxWithMetadata: vi.fn(),
@@ -16,7 +17,7 @@ vi.mock("@/server/api/http", async () => {
   const actual = await vi.importActual<typeof import("@/server/api/http")>("@/server/api/http");
   return {
     ...actual,
-    getSessionOrThrow: mocks.getSessionOrThrow
+    getSessionOrThrowWithPermission: mocks.getSessionOrThrowWithPermission
   };
 });
 
@@ -47,7 +48,7 @@ import { GET } from "./route";
 describe("GET /api/export/:jobId", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getSessionOrThrow.mockResolvedValue({
+    mocks.getSessionOrThrowWithPermission.mockResolvedValue({
       userId: "u1",
       organizationId: "org1",
       role: "ENGINEER"
@@ -68,6 +69,7 @@ describe("GET /api/export/:jobId", () => {
     });
 
     expect(response.status).toBe(200);
+    expect(mocks.getSessionOrThrowWithPermission).toHaveBeenCalledWith(expect.any(Request), "documents.export");
     expect(mocks.writeAuditEvent).toHaveBeenCalledWith(
       expect.objectContaining({ action: "document.export.zip", entityType: "GenerationJob", entityId: "j1" })
     );
@@ -100,5 +102,16 @@ describe("GET /api/export/:jobId", () => {
     });
 
     expect(response.status).toBe(422);
+  });
+
+  it("returns generic not found on foreign or unknown export identifiers", async () => {
+    mocks.exportDocumentAsPdfWithMetadata.mockRejectedValueOnce(new ApiError(404, "Document not found."));
+
+    const response = await GET(new Request("http://localhost/api/export/guessable-id?format=pdf&documentId=foreign"), {
+      params: Promise.resolve({ jobId: "guessable-id" })
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "Export target not found." });
   });
 });

@@ -1,0 +1,3 @@
+staging
+region=TBD
+cluster_or_app_name=TBD

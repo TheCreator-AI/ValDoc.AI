@@ -6,6 +6,7 @@ describe("rbac permission matrix", () => {
     expect(hasPermission("VIEWER", "templates.create")).toBe(false);
     expect(hasPermission("VIEWER", "templates.update")).toBe(false);
     expect(hasPermission("VIEWER", "templates.delete")).toBe(false);
+    expect(hasPermission("VIEWER", "documents.export")).toBe(true);
   });
 
   it("user can create templates but cannot approve templates", () => {

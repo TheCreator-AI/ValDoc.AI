@@ -1,0 +1,5 @@
+- Cross-org access denied
+- Approval immutability (edit blocked)
+- Signature re-auth prompt
+- Audit verify-chain success
+- Export success

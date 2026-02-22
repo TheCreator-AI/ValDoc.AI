@@ -15,6 +15,7 @@ RBAC matrix:
 - `GET /api/machines`
 - `POST /api/machines`
 - `POST /api/uploads` (`multipart/form-data`: `machineId`, `sourceType`, `file`)
+- `GET /api/search?q=...` (org-scoped source chunk search)
 
 ## Generation
 - `POST /api/generation/start` body: `{ "machineId": "...", "phase": "pre_execution|post_execution" }`

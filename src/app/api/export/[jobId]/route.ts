@@ -1,4 +1,4 @@
-import { ApiError, apiJson, getSessionOrThrow } from "@/server/api/http";
+import { ApiError, apiJson, getSessionOrThrowWithPermission } from "@/server/api/http";
 import { prisma } from "@/server/db/prisma";
 import { evaluateDocumentQualityGate } from "@/server/quality/documentQualityGate";
 import {
@@ -11,7 +11,7 @@ import { writeAuditEvent } from "@/server/audit/events";
 
 export async function GET(request: Request, context: { params: Promise<{ jobId: string }> }) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getSessionOrThrowWithPermission(request, "documents.export");
     const { jobId } = await context.params;
     const url = new URL(request.url);
     const format = url.searchParams.get("format") ?? "zip";
@@ -107,6 +107,9 @@ export async function GET(request: Request, context: { params: Promise<{ jobId: 
     return apiJson(400, { error: "Unsupported format." });
   } catch (error) {
     if (error instanceof ApiError) {
+      if (error.status === 404) {
+        return apiJson(404, { error: "Export target not found." });
+      }
       return apiJson(error.status, { error: error.message });
     }
     return apiJson(500, { error: "Export failed." });

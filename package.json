@@ -32,7 +32,10 @@
     "provision": "tsx scripts/provision.ts",
     "backup_db": "tsx scripts/backup_db.ts",
     "restore_db": "tsx scripts/restore_db.ts",
-    "verify_restore": "tsx scripts/verify_restore.ts"
+    "verify_restore": "tsx scripts/verify_restore.ts",
+    "evidence:pack": "tsx scripts/generate_evidence_pack.ts",
+    "evidence:tenant-isolation": "tsx scripts/capture_tenant_isolation_evidence.ts",
+    "audit:verify-chain:scheduled": "tsx scripts/run_audit_chain_verification.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",

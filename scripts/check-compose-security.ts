@@ -9,7 +9,9 @@ const composeFiles = fs
 
 const forbiddenPatterns = [
   /DISABLE_SECURITY_PLUGIN:\s*["']?true["']?/i,
-  /plugins\.security\.disabled:\s*["']?true["']?/i
+  /plugins\.security\.disabled:\s*["']?true["']?/i,
+  /MINIO_ROOT_USER:\s*(\$\{MINIO_ROOT_USER:-minioadmin\}|["']?minioadmin["']?)/i,
+  /MINIO_ROOT_PASSWORD:\s*(\$\{MINIO_ROOT_PASSWORD:-minioadmin\}|["']?minioadmin["']?)/i
 ];
 
 const violations: string[] = [];

@@ -1,4 +1,5 @@
 import { sanitizeUntrustedDocumentText } from "@/server/security/promptGuardrails";
+import { PDFParse } from "pdf-parse";
 
 export type CitationChunk = {
   page: number;
@@ -26,13 +27,30 @@ const splitIntoChunks = (text: string, page: number): CitationChunk[] => {
 
 export const parseSourceDocument = async (buffer: Buffer, mimeType: string) => {
   if (mimeType === "application/pdf") {
-    // Stub-safe PDF parsing for MVP portability across environments.
-    // Replace with page-aware parser (pdfjs/Document AI) for production citations.
-    const text = sanitizeUntrustedDocumentText(buffer.toString("latin1"));
-    return {
-      fullText: text,
-      chunks: splitIntoChunks(text, 1)
-    };
+    let parser: PDFParse | null = null;
+    try {
+      parser = new PDFParse({ data: new Uint8Array(buffer) });
+      const parsed = await parser.getText();
+      const normalizedPages =
+        parsed.pages.length > 0
+          ? parsed.pages.map((pageResult: { text: string }) => sanitizeUntrustedDocumentText(pageResult.text.trim()))
+          : parsed.text.split("\f").map((pageText: string) => sanitizeUntrustedDocumentText(pageText.trim()));
+      const fullText = normalizedPages.filter(Boolean).join("\n\n");
+      return {
+        fullText,
+        chunks: normalizedPages.flatMap((pageText: string, index: number) => splitIntoChunks(pageText, index + 1))
+      };
+    } catch {
+      const text = sanitizeUntrustedDocumentText(buffer.toString("latin1"));
+      return {
+        fullText: text,
+        chunks: splitIntoChunks(text, 1)
+      };
+    } finally {
+      if (parser) {
+        await parser.destroy().catch(() => undefined);
+      }
+    }
   }
 
   const text = sanitizeUntrustedDocumentText(buffer.toString("utf8"));

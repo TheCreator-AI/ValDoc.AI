@@ -17,6 +17,7 @@ const insecureSecretValues = new Set([
   "password",
   "secret"
 ]);
+const insecureMinioDefaults = new Set(["minioadmin", "admin", "password", "changeme"]);
 
 const isTrue = (value: string | undefined) => (value ?? "").trim().toLowerCase() === "true";
 const toPositiveIntOr = (value: string | undefined, fallback: number) => {
@@ -77,6 +78,14 @@ export const validateStartupConfig = (raw: RawEnv, log: (line: string) => void =
   const openSearchUrl = (raw.OPENSEARCH_URL ?? "").trim();
   const openSearchUsername = (raw.OPENSEARCH_USERNAME ?? "").trim();
   const openSearchPassword = (raw.OPENSEARCH_PASSWORD ?? "").trim();
+  const minioRootUser = (raw.MINIO_ROOT_USER ?? "").trim();
+  const minioRootPassword = (raw.MINIO_ROOT_PASSWORD ?? "").trim();
+  const rateLimitBackend = (raw.RATE_LIMIT_BACKEND ?? "memory").trim().toLowerCase();
+  const redisRestUrl = (raw.REDIS_REST_URL ?? "").trim();
+  const redisRestToken = (raw.REDIS_REST_TOKEN ?? "").trim();
+  const malwareScannerProvider = (raw.MALWARE_SCANNER_PROVIDER ?? "stub").trim().toLowerCase();
+  const managedMalwareUrl = (raw.MANAGED_MALWARE_SCAN_URL ?? "").trim();
+  const managedMalwareToken = (raw.MANAGED_MALWARE_SCAN_TOKEN ?? "").trim();
   const sessionMaxAgeSeconds = toPositiveIntOr(raw.SESSION_MAX_AGE_SECONDS, 8 * 60 * 60);
   const idleTimeoutSeconds = toPositiveIntOr(raw.SESSION_IDLE_TIMEOUT_SECONDS, 30 * 60);
 
@@ -94,6 +103,34 @@ export const validateStartupConfig = (raw: RawEnv, log: (line: string) => void =
   }
   if (isProduction) {
     assertStrongSecret("BACKUP_ENCRYPTION_KEY", raw.BACKUP_ENCRYPTION_KEY, 32);
+    if (!["redis", "gateway"].includes(rateLimitBackend)) {
+      throw new Error("RATE_LIMIT_BACKEND must be set to 'redis' or 'gateway' in production.");
+    }
+    if (rateLimitBackend === "redis") {
+      if (!redisRestUrl.startsWith("https://")) {
+        throw new Error("REDIS_REST_URL must use https:// when RATE_LIMIT_BACKEND=redis in production.");
+      }
+      assertStrongSecret("REDIS_REST_TOKEN", redisRestToken, 20);
+    }
+    if (malwareScannerProvider === "stub") {
+      throw new Error("MALWARE_SCANNER_PROVIDER cannot be 'stub' in production.");
+    }
+    if (!["clamav", "managed"].includes(malwareScannerProvider)) {
+      throw new Error("MALWARE_SCANNER_PROVIDER must be 'clamav' or 'managed' in production.");
+    }
+    if (malwareScannerProvider === "managed") {
+      if (!managedMalwareUrl.startsWith("https://")) {
+        throw new Error("MANAGED_MALWARE_SCAN_URL must use https:// in production.");
+      }
+      assertStrongSecret("MANAGED_MALWARE_SCAN_TOKEN", managedMalwareToken, 20);
+    }
+    if (
+      minioRootUser &&
+      minioRootPassword &&
+      (insecureMinioDefaults.has(minioRootUser.toLowerCase()) || insecureMinioDefaults.has(minioRootPassword.toLowerCase()))
+    ) {
+      throw new Error("MinIO default credentials are not allowed in production.");
+    }
     if (sessionMaxAgeSeconds > 24 * 60 * 60) {
       throw new Error("SESSION_MAX_AGE_SECONDS exceeds production maximum of 86400 seconds.");
     }

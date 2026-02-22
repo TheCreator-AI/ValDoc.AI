@@ -1,0 +1,9 @@
+{
+  "quarantineId": "4b1f28d1-ab59-4014-9f04-d85e45397c1e",
+  "originalFileName": "manual.pdf",
+  "detectedMimeType": "application/pdf",
+  "sizeBytes": 29,
+  "kind": "SOURCE_DOCUMENT",
+  "reason": "malware.signature.test",
+  "quarantinedAt": "2026-02-22T17:11:57.425Z"
+}

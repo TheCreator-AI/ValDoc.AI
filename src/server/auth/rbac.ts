@@ -11,6 +11,7 @@ export type Permission =
   | "units.read"
   | "units.write"
   | "documents.generate"
+  | "documents.export"
   | "audit.read"
   | "users.manage_roles"
   | "organizations.manage";
@@ -42,6 +43,7 @@ const permissionMatrix: Record<CanonicalRole, Set<Permission>> = {
     "units.read",
     "units.write",
     "documents.generate",
+    "documents.export",
     "audit.read",
     "users.manage_roles",
     "organizations.manage"
@@ -54,20 +56,18 @@ const permissionMatrix: Record<CanonicalRole, Set<Permission>> = {
     "equipment.write",
     "units.read",
     "units.write",
-    "documents.generate"
+    "documents.generate",
+    "documents.export"
   ]),
   APPROVER: new Set<Permission>([
     "templates.read",
     "templates.approve",
     "equipment.read",
-    "units.read"
+    "units.read",
+    "documents.export"
   ]),
-  REVIEWER: new Set<Permission>([
-    "templates.read",
-    "equipment.read",
-    "units.read"
-  ]),
-  VIEWER: new Set<Permission>(["templates.read", "equipment.read", "units.read"])
+  REVIEWER: new Set<Permission>(["templates.read", "equipment.read", "units.read", "documents.export"]),
+  VIEWER: new Set<Permission>(["templates.read", "equipment.read", "units.read", "documents.export"])
 };
 
 export const hasRole = (userRole: Role, minimumRole: Role) => {

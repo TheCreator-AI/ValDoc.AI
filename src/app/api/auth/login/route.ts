@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   }
 
   const clientIp = getClientIp(request) ?? "unknown";
-  const rateLimit = checkAndConsumeRateLimit({
+  const rateLimit = await checkAndConsumeRateLimit({
     key: `auth:login:${clientIp}:${body.email.toLowerCase()}`,
     limit: 12,
     windowMs: 5 * 60 * 1000
