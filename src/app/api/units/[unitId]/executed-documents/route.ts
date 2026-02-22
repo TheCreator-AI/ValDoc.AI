@@ -46,9 +46,16 @@ export async function GET(_request: Request, context: { params: Promise<{ unitId
 }
 
 export async function POST(request: Request, context: { params: Promise<{ unitId: string }> }) {
+  let sessionRef: { organizationId: string; userId: string } | null = null;
+  let unitIdRef = "";
+  let titleRef = "";
+  let documentTypeRef = "OTHER";
+  let fileNameRef = "";
   try {
     const session = await getSessionOrThrow("ENGINEER");
+    sessionRef = { organizationId: session.organizationId, userId: session.userId };
     const { unitId } = await context.params;
+    unitIdRef = unitId;
 
     const unit = await prisma.unit.findFirst({
       where: {
@@ -65,10 +72,13 @@ export async function POST(request: Request, context: { params: Promise<{ unitId
     const file = formData.get("file");
     const title = String(formData.get("title") ?? "").trim();
     const documentTypeRaw = String(formData.get("documentType") ?? "OTHER").trim();
+    titleRef = title;
+    documentTypeRef = documentTypeRaw;
 
     if (!(file instanceof File)) {
       return apiJson(400, { error: "file is required." });
     }
+    fileNameRef = file.name;
 
     const stored = await saveUploadedFile(file, { kind: "EXECUTED_DOCUMENT" });
 
@@ -96,7 +106,31 @@ export async function POST(request: Request, context: { params: Promise<{ unitId
 
     return apiJson(201, created);
   } catch (error) {
-    if (error instanceof ApiError) return apiJson(error.status, { error: error.message });
+    if (error instanceof ApiError) {
+      if (sessionRef) {
+        try {
+          await writeAuditEvent({
+            organizationId: sessionRef.organizationId,
+            actorUserId: sessionRef.userId,
+            action: "document.upload.executed",
+            entityType: "UnitExecutedDocument",
+            entityId: unitIdRef || "unknown",
+            outcome: "DENIED",
+            details: {
+              unitId: unitIdRef || null,
+              title: titleRef || null,
+              documentType: documentTypeRef,
+              fileName: fileNameRef || null,
+              reason: error.message
+            },
+            request
+          });
+        } catch {
+          // swallow audit failures for response path
+        }
+      }
+      return apiJson(error.status, { error: error.message });
+    }
     const details = error instanceof Error ? error.message : "Unknown error";
     return apiJson(500, { error: `Failed to upload executed unit document. ${details}` });
   }

@@ -42,4 +42,32 @@ describe("audit hash chain", () => {
     expect(result.ok).toBe(false);
     expect(result.brokenEventId).toBe("eX");
   });
+
+  it("fails when events from different organizations are mixed into one chain", () => {
+    const first = payload("v1");
+    const second = { ...payload("v2"), organizationId: "org2" };
+    const firstHash = computeEventHash("", first);
+    const secondHash = computeEventHash(firstHash, second);
+    const result = verifyAuditChain([
+      { id: "e1", prevHash: "", eventHash: firstHash, payload: first },
+      { id: "e2", prevHash: firstHash, eventHash: secondHash, payload: second }
+    ]);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("organization_mismatch");
+    expect(result.brokenEventId).toBe("e2");
+  });
+
+  it("hashes equivalent metadata JSON deterministically regardless of key order", () => {
+    const a = {
+      ...payload("v1"),
+      metadataJson: "{\"a\":1,\"b\":2}",
+      detailsJson: "{\"x\":1,\"y\":2}"
+    };
+    const b = {
+      ...payload("v1"),
+      metadataJson: "{\"b\":2,\"a\":1}",
+      detailsJson: "{\"y\":2,\"x\":1}"
+    };
+    expect(computeEventHash("", a)).toBe(computeEventHash("", b));
+  });
 });

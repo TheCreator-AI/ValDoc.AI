@@ -18,6 +18,26 @@ const insecureSecretValues = new Set([
   "secret"
 ]);
 
+const isTrue = (value: string | undefined) => (value ?? "").trim().toLowerCase() === "true";
+const toPositiveIntOr = (value: string | undefined, fallback: number) => {
+  const parsed = Number.parseInt((value ?? "").trim(), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return parsed;
+};
+
+const assertStrongSecret = (name: string, value: string | undefined, minLength = 32) => {
+  const normalized = (value ?? "").trim();
+  if (!normalized) {
+    throw new Error(`${name} is required.`);
+  }
+  if (normalized.length < minLength) {
+    throw new Error(`${name} must be at least ${minLength} characters.`);
+  }
+  if (insecureSecretValues.has(normalized.toLowerCase())) {
+    throw new Error(`${name} uses an insecure placeholder value.`);
+  }
+};
+
 export const validateRequiredEnv = (raw: RawEnv): RequiredEnv => {
   const missing: string[] = [];
   const normalized = {} as RequiredEnv;
@@ -51,6 +71,37 @@ export const getRequiredEnv = () => validateRequiredEnv(process.env);
 
 export const validateStartupConfig = (raw: RawEnv, log: (line: string) => void = console.info) => {
   const env = validateRequiredEnv(raw);
+  const isProduction = (raw.NODE_ENV ?? "").trim().toLowerCase() === "production";
+  const openSearchEnabled = isTrue(raw.ENABLE_OPENSEARCH);
+  const openSearchSecurityDisabled = isTrue(raw.OPENSEARCH_SECURITY_DISABLED);
+  const openSearchUrl = (raw.OPENSEARCH_URL ?? "").trim();
+  const openSearchUsername = (raw.OPENSEARCH_USERNAME ?? "").trim();
+  const openSearchPassword = (raw.OPENSEARCH_PASSWORD ?? "").trim();
+  const sessionMaxAgeSeconds = toPositiveIntOr(raw.SESSION_MAX_AGE_SECONDS, 8 * 60 * 60);
+  const idleTimeoutSeconds = toPositiveIntOr(raw.SESSION_IDLE_TIMEOUT_SECONDS, 30 * 60);
+
+  if (isProduction && openSearchEnabled && openSearchSecurityDisabled) {
+    throw new Error("OpenSearch security must be enabled in production (OPENSEARCH_SECURITY_DISABLED cannot be true).");
+  }
+  if (isProduction && openSearchEnabled && !openSearchUrl.startsWith("https://")) {
+    throw new Error("OpenSearch URL must use https:// in production.");
+  }
+  if (isProduction && openSearchEnabled && (!openSearchUsername || !openSearchPassword)) {
+    throw new Error("OpenSearch credentials are required in production when indexing is enabled.");
+  }
+  if (isProduction && openSearchEnabled) {
+    assertStrongSecret("OPENSEARCH_PASSWORD", openSearchPassword, 16);
+  }
+  if (isProduction) {
+    assertStrongSecret("BACKUP_ENCRYPTION_KEY", raw.BACKUP_ENCRYPTION_KEY, 32);
+    if (sessionMaxAgeSeconds > 24 * 60 * 60) {
+      throw new Error("SESSION_MAX_AGE_SECONDS exceeds production maximum of 86400 seconds.");
+    }
+  }
+  if (idleTimeoutSeconds > sessionMaxAgeSeconds) {
+    throw new Error("SESSION_IDLE_TIMEOUT_SECONDS must be less than or equal to SESSION_MAX_AGE_SECONDS.");
+  }
+
   log(`Config validation executed for organization: ${env.ORG_NAME} (${env.CUSTOMER_ID}).`);
   return env;
 };

@@ -33,4 +33,19 @@ describe("extractFactModel", () => {
       units: "C"
     });
   });
+
+  it("ignores instruction-like text and still extracts factual fields", () => {
+    const result = extractFactModel("source-3", [
+      { page: 1, section: "Section 1", text: "[INSTRUCTION_TEXT_REDACTED] [INSTRUCTION_TEXT_REDACTED]" },
+      { page: 1, section: "Section 2", text: "Intended use is sample storage. Temperature 2 to 8 C." }
+    ]);
+
+    expect(result.intendedUse).toContain("Intended use");
+    expect(result.processRanges[0]).toEqual({
+      parameter: "Temperature",
+      min: 2,
+      max: 8,
+      units: "C"
+    });
+  });
 });

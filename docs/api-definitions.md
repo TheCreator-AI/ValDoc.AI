@@ -51,9 +51,16 @@ RBAC matrix:
 
 ## Audit Chain Verification
 - `GET /api/admin/audit/verify-chain`
+- `POST /api/admin/audit/verify-chain`
+  - generates and stores signed tamper-evidence verification report
+- `GET /api/admin/audit/verify-chain/reports/{reportId}/download`
+  - downloads stored signed tamper-evidence report
 - `GET /admin/audit/verify-chain` (alias)
   - Admin/audit.read only
   - returns pass/fail, first broken event id, and checked event count
+- `GET /api/admin/audit/export`
+  - Admin only
+  - exports filtered audit events as CSV
 
 ## System Time Status
 - `GET /api/admin/system-time-status`

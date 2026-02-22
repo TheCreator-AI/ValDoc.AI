@@ -119,7 +119,21 @@ describe("backup/restore integration", () => {
         }
       });
 
-      const createdEvent = await client.auditEvent.create({
+      const timestamp = new Date("2026-02-18T00:00:00.000Z");
+      const hash = computeEventHash("", {
+        organizationId: "org1",
+        actorUserId: "u1",
+        action: "document.version.create",
+        entityType: "DocumentVersion",
+        entityId: "v1",
+        outcome: "SUCCESS",
+        metadataJson: "{\"seed\":true}",
+        detailsJson: "{\"seed\":true}",
+        ip: null,
+        userAgent: null,
+        timestampIso: timestamp.toISOString()
+      });
+      await client.auditEvent.create({
         data: {
           id: "a1",
           organizationId: "org1",
@@ -131,26 +145,9 @@ describe("backup/restore integration", () => {
           metadataJson: "{\"seed\":true}",
           detailsJson: "{\"seed\":true}",
           prevHash: "",
-          eventHash: "pending-hash",
-          timestamp: new Date("2026-02-18T00:00:00.000Z")
+          eventHash: hash,
+          timestamp
         }
-      });
-      const hash = computeEventHash("", {
-        organizationId: createdEvent.organizationId,
-        actorUserId: createdEvent.actorUserId,
-        action: createdEvent.action,
-        entityType: createdEvent.entityType,
-        entityId: createdEvent.entityId,
-        outcome: createdEvent.outcome,
-        metadataJson: createdEvent.metadataJson,
-        detailsJson: createdEvent.detailsJson,
-        ip: createdEvent.ip,
-        userAgent: createdEvent.userAgent,
-        timestampIso: createdEvent.timestamp.toISOString()
-      });
-      await client.auditEvent.update({
-        where: { id: createdEvent.id },
-        data: { eventHash: hash }
       });
       await client.auditChainHead.create({
         data: {

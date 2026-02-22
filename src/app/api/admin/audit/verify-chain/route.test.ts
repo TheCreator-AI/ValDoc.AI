@@ -4,7 +4,8 @@ import { ApiError } from "@/server/api/http";
 const mocks = vi.hoisted(() => ({
   getSessionOrThrowWithPermission: vi.fn(),
   auditFindMany: vi.fn(),
-  chainHeadFindUnique: vi.fn()
+  chainHeadFindUnique: vi.fn(),
+  generateTamperEvidenceReport: vi.fn()
 }));
 
 vi.mock("@/server/api/http", async () => {
@@ -22,7 +23,11 @@ vi.mock("@/server/db/prisma", () => ({
   }
 }));
 
-import { GET } from "./route";
+vi.mock("@/server/audit/verificationReport", () => ({
+  generateTamperEvidenceReport: mocks.generateTamperEvidenceReport
+}));
+
+import { GET, POST } from "./route";
 import { computeEventHash } from "@/server/audit/chain";
 
 describe("GET /api/admin/audit/verify-chain", () => {
@@ -108,5 +113,32 @@ describe("GET /api/admin/audit/verify-chain", () => {
     mocks.getSessionOrThrowWithPermission.mockRejectedValueOnce(new ApiError(403, "Insufficient permissions."));
     const response = await GET(new Request("http://localhost/api/admin/audit/verify-chain"));
     expect(response.status).toBe(403);
+  });
+
+  it("generates a signed tamper-evidence report", async () => {
+    mocks.generateTamperEvidenceReport.mockResolvedValueOnce({
+      reportId: "avr1",
+      reportHash: "hash1",
+      signature: "sig1",
+      pass: true,
+      checkedEvents: 10,
+      reportPath: "storage/audit-verification-reports/a.json"
+    });
+    const response = await POST(
+      new Request("http://localhost/api/admin/audit/verify-chain", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dateFrom: "2026-02-01T00:00:00.000Z", dateTo: "2026-02-20T00:00:00.000Z" })
+      })
+    );
+    expect(response.status).toBe(201);
+    expect(mocks.generateTamperEvidenceReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: "org1",
+        actorUserId: "u1",
+        dateFrom: "2026-02-01T00:00:00.000Z",
+        dateTo: "2026-02-20T00:00:00.000Z"
+      })
+    );
   });
 });

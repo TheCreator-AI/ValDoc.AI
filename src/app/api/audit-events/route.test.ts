@@ -22,7 +22,8 @@ vi.mock("@/server/db/prisma", () => ({
   }
 }));
 
-import { GET } from "./route";
+import * as routeModule from "./route";
+const { GET } = routeModule;
 
 describe("GET /api/audit-events", () => {
   beforeEach(() => {
@@ -79,5 +80,12 @@ describe("GET /api/audit-events", () => {
     mocks.getSessionOrThrowWithPermission.mockRejectedValueOnce(new ApiError(403, "Insufficient permissions."));
     const response = await GET(new Request("http://localhost/api/audit-events"));
     expect(response.status).toBe(403);
+  });
+
+  it("does not expose mutation handlers", () => {
+    expect((routeModule as Record<string, unknown>).POST).toBeUndefined();
+    expect((routeModule as Record<string, unknown>).PUT).toBeUndefined();
+    expect((routeModule as Record<string, unknown>).PATCH).toBeUndefined();
+    expect((routeModule as Record<string, unknown>).DELETE).toBeUndefined();
   });
 });

@@ -4,7 +4,8 @@ import { ApiError } from "@/server/api/http";
 const mocks = vi.hoisted(() => ({
   getSessionOrThrow: vi.fn(),
   ingestUpload: vi.fn(),
-  writeAuditEvent: vi.fn()
+  writeAuditEvent: vi.fn(),
+  checkAndConsumeRateLimit: vi.fn()
 }));
 
 vi.mock("@/server/api/http", async () => {
@@ -23,6 +24,10 @@ vi.mock("@/server/audit/events", () => ({
   writeAuditEvent: mocks.writeAuditEvent
 }));
 
+vi.mock("@/server/security/rateLimit", () => ({
+  checkAndConsumeRateLimit: mocks.checkAndConsumeRateLimit
+}));
+
 import { POST } from "./route";
 
 describe("POST /api/uploads", () => {
@@ -33,6 +38,7 @@ describe("POST /api/uploads", () => {
       organizationId: "org1",
       role: "ENGINEER"
     });
+    mocks.checkAndConsumeRateLimit.mockReturnValue({ allowed: true, remaining: 59, retryAfterSeconds: 0 });
     mocks.ingestUpload.mockResolvedValue({ sourceId: "s1", chunksIndexed: 1, factModel: {} });
   });
 
@@ -70,6 +76,29 @@ describe("POST /api/uploads", () => {
         action: "document.upload.source",
         entityType: "SourceDocument",
         entityId: "s1"
+      })
+    );
+  });
+
+  it("returns 429 when upload rate limit is exceeded", async () => {
+    mocks.checkAndConsumeRateLimit.mockReturnValueOnce({ allowed: false, remaining: 0, retryAfterSeconds: 120 });
+    const response = await POST(buildRequest(new File([Buffer.from("%PDF-1.7")], "manual.pdf", { type: "application/pdf" })));
+    expect(response.status).toBe(429);
+  });
+
+  it("writes denied audit event when malware scanner rejects upload", async () => {
+    mocks.ingestUpload.mockRejectedValueOnce(
+      new ApiError(400, "File rejected by malware scanner: eicar. Quarantine ID: quarantine-123.")
+    );
+    const response = await POST(buildRequest(new File([Buffer.from("%PDF-1.7")], "manual.pdf", { type: "application/pdf" })));
+    expect(response.status).toBe(400);
+    expect(mocks.writeAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "document.upload.source",
+        outcome: "DENIED",
+        details: expect.objectContaining({
+          reason: expect.stringContaining("malware scanner")
+        })
       })
     );
   });

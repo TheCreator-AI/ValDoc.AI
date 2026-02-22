@@ -46,13 +46,18 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  let sessionRef: { organizationId: string; userId: string } | null = null;
+  let docTypeRef: string | null = null;
+  let fileNamesRef: string[] = [];
   try {
     const session = await getSessionOrThrowWithPermission(request, "templates.create");
+    sessionRef = { organizationId: session.organizationId, userId: session.userId };
     const contentType = request.headers.get("content-type") ?? "";
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
       const docTypeRaw = String(formData.get("docType") ?? "");
+      docTypeRef = docTypeRaw || null;
       if (!Object.values(DocType).includes(docTypeRaw as DocType)) {
         return apiJson(400, { error: "Valid docType is required." });
       }
@@ -60,6 +65,7 @@ export async function POST(request: Request) {
       const files = formData
         .getAll("files")
         .filter((item): item is File => item instanceof File);
+      fileNamesRef = files.map((file) => file.name);
 
       if (files.length === 0) {
         return apiJson(400, { error: "At least one template file is required." });
@@ -125,6 +131,26 @@ export async function POST(request: Request) {
     return apiJson(400, { error: "Unsupported template save request." });
   } catch (error) {
     if (error instanceof ApiError) {
+      if (sessionRef) {
+        try {
+          await writeAuditEvent({
+            organizationId: sessionRef.organizationId,
+            actorUserId: sessionRef.userId,
+            action: "template.create",
+            entityType: "DocumentTemplate",
+            entityId: docTypeRef ?? "unknown",
+            outcome: "DENIED",
+            details: {
+              docType: docTypeRef,
+              fileNames: fileNamesRef,
+              reason: error.message
+            },
+            request
+          });
+        } catch {
+          // swallow audit failures for response path
+        }
+      }
       return apiJson(error.status, { error: error.message });
     }
     const details = error instanceof Error ? error.message : "Unknown error";

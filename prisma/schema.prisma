@@ -125,6 +125,7 @@ model Organization {
   accessReviewReports AccessReviewReport[]
   sessions UserSession[]
   appReleases AppRelease[]
+  auditVerificationReports AuditVerificationReport[]
 }
 
 model DeploymentConfig {
@@ -169,6 +170,7 @@ model User {
   accessReviewReports AccessReviewReport[] @relation("AccessReviewReportCreator")
   appReleasesCreated AppRelease[] @relation("AppReleaseCreator")
   appReleasesApproved AppRelease[] @relation("AppReleaseApprover")
+  auditVerificationReports AuditVerificationReport[] @relation("AuditVerificationReportActor")
 }
 
 model Machine {
@@ -551,6 +553,10 @@ model AppRelease {
   releaseDate        DateTime
   changeSummary      String
   riskImpact         String
+  buildHash          String               @default("")
+  sbomHash           String               @default("")
+  testResultsSummaryHash String           @default("")
+  productionDeployRequested Boolean       @default(false)
   approvedSignatureId String?
   approvedByUserId   String?
   deployedAt         DateTime?
@@ -610,6 +616,30 @@ model AccessReviewReport {
   createdAt           DateTime      @default(now())
   organization        Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   generator           User          @relation("AccessReviewReportCreator", fields: [generatedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+}
+
+model AuditVerificationReport {
+  id                String       @id @default(cuid())
+  organizationId    String
+  actorUserId       String
+  verifiedAt        DateTime     @default(now())
+  rangeStart        DateTime?
+  rangeEnd          DateTime?
+  checkedEvents     Int
+  chainHeadStored   String?
+  chainHeadComputed String?
+  pass              Boolean
+  firstBrokenEventId String?
+  failureReason     String?
+  reportJson        String
+  reportHash        String
+  signature         String
+  reportPath        String
+  createdAt         DateTime     @default(now())
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor             User         @relation("AuditVerificationReportActor", fields: [actorUserId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, createdAt])
 }

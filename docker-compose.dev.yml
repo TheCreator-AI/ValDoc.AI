@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  app:
+    environment:
+      OPENSEARCH_URL: ${OPENSEARCH_URL:-http://opensearch:9200}
+      OPENSEARCH_SECURITY_DISABLED: ${OPENSEARCH_SECURITY_DISABLED:-true}
+
+  opensearch:
+    environment:
+      DISABLE_SECURITY_PLUGIN: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: ${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-ChangeMe123!}
+    profiles:
+      - search-dev

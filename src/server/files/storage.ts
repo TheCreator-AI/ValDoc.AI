@@ -6,6 +6,7 @@ import { scanUploadedBuffer, type MalwareScanner, type UploadKind } from "@/serv
 
 const storageRoot = path.resolve(process.cwd(), "storage");
 const uploadsDir = path.join(storageRoot, "uploads");
+const quarantineDir = path.join(storageRoot, "quarantine");
 
 const limitsByKind: Record<UploadKind, number> = {
   SOURCE_DOCUMENT: 25 * 1024 * 1024,
@@ -14,8 +15,27 @@ const limitsByKind: Record<UploadKind, number> = {
   VENDOR_DOCUMENT: 50 * 1024 * 1024
 };
 
+const maxPdfPagesByKind: Record<UploadKind, number> = {
+  SOURCE_DOCUMENT: 1000,
+  TEMPLATE: 1000,
+  EXECUTED_DOCUMENT: 2000,
+  VENDOR_DOCUMENT: 2000
+};
+
+const zipSecurityLimits = {
+  maxEntries: 1500,
+  maxNestedArchiveEntries: 0,
+  maxTotalUncompressedBytes: 250 * 1024 * 1024,
+  maxEntryUncompressedBytes: 50 * 1024 * 1024,
+  maxCompressionRatio: 100
+} as const;
+
 const ensureUploadsDir = async () => {
   await fs.promises.mkdir(uploadsDir, { recursive: true });
+};
+
+const ensureQuarantineDir = async () => {
+  await fs.promises.mkdir(quarantineDir, { recursive: true });
 };
 
 const sanitizeDisplayName = (value: string) => {
@@ -47,6 +67,104 @@ const isLikelyUtf8Text = (buffer: Buffer) => {
     return !/[\u0001-\u0008\u000b\u000c\u000e-\u001f]/.test(sample);
   } catch {
     return false;
+  }
+};
+
+const countPdfPages = (buffer: Buffer) => {
+  const text = buffer.toString("latin1");
+  const matches = text.match(/\/Type\s*\/Page\b/g);
+  return matches?.length ?? 0;
+};
+
+type ZipCentralEntry = {
+  fileName: string;
+  compressedSize: number;
+  uncompressedSize: number;
+};
+
+const parseZipCentralDirectory = (buffer: Buffer): ZipCentralEntry[] => {
+  const eocdSignature = 0x06054b50;
+  let eocdOffset = -1;
+  const minOffset = Math.max(0, buffer.length - 66000);
+  for (let i = buffer.length - 22; i >= minOffset; i -= 1) {
+    if (buffer.readUInt32LE(i) === eocdSignature) {
+      eocdOffset = i;
+      break;
+    }
+  }
+  if (eocdOffset < 0) {
+    throw new ApiError(400, "Invalid DOCX archive: missing zip directory.");
+  }
+
+  const centralDirectorySize = buffer.readUInt32LE(eocdOffset + 12);
+  const centralDirectoryOffset = buffer.readUInt32LE(eocdOffset + 16);
+  const end = centralDirectoryOffset + centralDirectorySize;
+  if (centralDirectoryOffset < 0 || end > buffer.length) {
+    throw new ApiError(400, "Invalid DOCX archive: invalid central directory bounds.");
+  }
+
+  const entries: ZipCentralEntry[] = [];
+  let cursor = centralDirectoryOffset;
+  while (cursor + 46 <= end) {
+    const signature = buffer.readUInt32LE(cursor);
+    if (signature !== 0x02014b50) {
+      break;
+    }
+    const compressedSize = buffer.readUInt32LE(cursor + 20);
+    const uncompressedSize = buffer.readUInt32LE(cursor + 24);
+    const fileNameLength = buffer.readUInt16LE(cursor + 28);
+    const extraLength = buffer.readUInt16LE(cursor + 30);
+    const commentLength = buffer.readUInt16LE(cursor + 32);
+    const headerSize = 46 + fileNameLength + extraLength + commentLength;
+    if (cursor + headerSize > end) {
+      throw new ApiError(400, "Invalid DOCX archive: malformed central directory entry.");
+    }
+    const fileName = buffer.toString("utf8", cursor + 46, cursor + 46 + fileNameLength);
+    entries.push({ fileName, compressedSize, uncompressedSize });
+    cursor += headerSize;
+  }
+
+  if (entries.length === 0) {
+    throw new ApiError(400, "Invalid DOCX archive: no file entries found.");
+  }
+  return entries;
+};
+
+const enforceDocxArchiveLimits = (buffer: Buffer) => {
+  const entries = parseZipCentralDirectory(buffer);
+  if (entries.length > zipSecurityLimits.maxEntries) {
+    throw new ApiError(413, `DOCX archive has too many entries. Limit is ${zipSecurityLimits.maxEntries}.`);
+  }
+
+  let totalCompressed = 0;
+  let totalUncompressed = 0;
+  let nestedArchiveEntries = 0;
+  for (const entry of entries) {
+    totalCompressed += entry.compressedSize;
+    totalUncompressed += entry.uncompressedSize;
+    if (entry.uncompressedSize > zipSecurityLimits.maxEntryUncompressedBytes) {
+      throw new ApiError(413, "DOCX archive entry is too large.");
+    }
+    if (/\.(zip|7z|rar|tar|gz|bz2)$/i.test(entry.fileName)) {
+      nestedArchiveEntries += 1;
+    }
+  }
+
+  if (nestedArchiveEntries > zipSecurityLimits.maxNestedArchiveEntries) {
+    throw new ApiError(400, "Nested archives are not allowed in DOCX uploads.");
+  }
+  if (totalUncompressed > zipSecurityLimits.maxTotalUncompressedBytes) {
+    throw new ApiError(413, "DOCX archive uncompressed size exceeds safety limits.");
+  }
+  const denominator = Math.max(totalCompressed, 1);
+  const ratio = totalUncompressed / denominator;
+  if (ratio > zipSecurityLimits.maxCompressionRatio) {
+    throw new ApiError(413, "DOCX archive compression ratio exceeds safety limits.");
+  }
+
+  const names = new Set(entries.map((entry) => entry.fileName));
+  if (!names.has("[Content_Types].xml") || !Array.from(names).some((name) => name.startsWith("word/"))) {
+    throw new ApiError(400, "Invalid DOCX archive contents.");
   }
 };
 
@@ -152,6 +270,17 @@ export const saveUploadedFile = async (
   ensureMimeMatchesSignature(file.type ?? null, detected.extension);
   ensureKindAllowedMime(kind, detected.mimeType);
 
+  if (detected.extension === ".pdf") {
+    const pageCount = countPdfPages(bytes);
+    if (pageCount > maxPdfPagesByKind[kind]) {
+      throw new ApiError(413, `PDF page count exceeds limit of ${maxPdfPagesByKind[kind]}.`);
+    }
+  }
+
+  if (detected.extension === ".docx") {
+    enforceDocxArchiveLimits(bytes);
+  }
+
   const scan = options?.scanner ?? scanUploadedBuffer;
   const scanResult = await scan({
     bytes,
@@ -160,7 +289,35 @@ export const saveUploadedFile = async (
     kind
   });
   if (!scanResult.clean) {
-    throw new ApiError(400, `File rejected by malware scanner${scanResult.reason ? `: ${scanResult.reason}` : ""}.`);
+    await ensureQuarantineDir();
+    const quarantineId = randomUUID();
+    const quarantineExtension = detected.extension || ".bin";
+    const quarantineFilePath = path.join(quarantineDir, `${quarantineId}${quarantineExtension}`);
+    const quarantineMetaPath = path.join(quarantineDir, `${quarantineId}.json`);
+    ensureStoragePathIsSafe(quarantineFilePath);
+    ensureStoragePathIsSafe(quarantineMetaPath);
+    await fs.promises.writeFile(quarantineFilePath, bytes);
+    await fs.promises.writeFile(
+      quarantineMetaPath,
+      JSON.stringify(
+        {
+          quarantineId,
+          originalFileName: sanitizeDisplayName(file.name),
+          detectedMimeType: detected.mimeType,
+          sizeBytes: bytes.length,
+          kind,
+          reason: scanResult.reason ?? "malware_scan_failed",
+          quarantinedAt: new Date().toISOString()
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+    throw new ApiError(
+      400,
+      `File rejected by malware scanner${scanResult.reason ? `: ${scanResult.reason}` : ""}. Quarantine ID: ${quarantineId}.`
+    );
   }
 
   await ensureUploadsDir();
@@ -170,6 +327,7 @@ export const saveUploadedFile = async (
   await fs.promises.writeFile(filePath, bytes);
 
   return {
+    fileId: storedName.replace(detected.extension, ""),
     filePath,
     fileName: sanitizeDisplayName(file.name),
     mimeType: detected.mimeType,

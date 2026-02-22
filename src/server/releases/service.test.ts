@@ -119,9 +119,59 @@ describe("release service", () => {
         releaseDate: new Date("2026-02-19T00:00:00.000Z"),
         changeSummary: "initial",
         riskImpact: "MEDIUM",
+        buildHash: "sha256-build",
+        sbomHash: "sha256-sbom",
+        testResultsSummaryHash: "sha256-tests",
+        productionDeployRequested: false,
         deployedAt: null
       }
     });
     expect(created.buildVersion).toBe("1.0.0");
+    expect(mocks.releaseCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          buildHash: "sha256-build",
+          sbomHash: "sha256-sbom",
+          testResultsSummaryHash: "sha256-tests",
+          productionDeployRequested: false
+        })
+      })
+    );
+  });
+
+  it("blocks creating release with production deploy requested before approval", async () => {
+    await expect(
+      createReleaseEntry({
+        organizationId: "org1",
+        actorUserId: "u1",
+        payload: {
+          buildVersion: "1.0.1",
+          releaseDate: new Date("2026-02-19T00:00:00.000Z"),
+          changeSummary: "initial",
+          riskImpact: "MEDIUM",
+          buildHash: "sha256-build",
+          sbomHash: "sha256-sbom",
+          testResultsSummaryHash: "sha256-tests",
+          productionDeployRequested: true,
+          deployedAt: null
+        }
+      })
+    ).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it("blocks production deploy flag update before approval signature", async () => {
+    mocks.releaseFindFirst.mockResolvedValueOnce({
+      id: "rel1",
+      approvedSignatureId: null
+    });
+
+    await expect(
+      updateReleaseEntry({
+        organizationId: "org1",
+        releaseId: "rel1",
+        actorUserId: "u1",
+        patch: { productionDeployRequested: true }
+      })
+    ).rejects.toBeInstanceOf(ApiError);
   });
 });

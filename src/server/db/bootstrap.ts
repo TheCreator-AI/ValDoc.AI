@@ -32,7 +32,8 @@ export const ensureDatabaseInitialized = async () => {
     const message = error instanceof Error ? error.message.toLowerCase() : "";
     return (
       message.includes("duplicate column name") ||
-      message.includes("already exists")
+      message.includes("already exists") ||
+      message.includes("unique constraint failed")
     );
   };
 
@@ -105,6 +106,10 @@ export const ensureDatabaseInitialized = async () => {
   await ensureColumn("AuditEvent", "userAgent", "ALTER TABLE \"AuditEvent\" ADD COLUMN \"userAgent\" TEXT");
   await ensureColumn("AuditEvent", "prevHash", "ALTER TABLE \"AuditEvent\" ADD COLUMN \"prevHash\" TEXT");
   await ensureColumn("AuditEvent", "eventHash", "ALTER TABLE \"AuditEvent\" ADD COLUMN \"eventHash\" TEXT");
+  await ensureColumn("AppRelease", "buildHash", "ALTER TABLE \"AppRelease\" ADD COLUMN \"buildHash\" TEXT NOT NULL DEFAULT ''");
+  await ensureColumn("AppRelease", "sbomHash", "ALTER TABLE \"AppRelease\" ADD COLUMN \"sbomHash\" TEXT NOT NULL DEFAULT ''");
+  await ensureColumn("AppRelease", "testResultsSummaryHash", "ALTER TABLE \"AppRelease\" ADD COLUMN \"testResultsSummaryHash\" TEXT NOT NULL DEFAULT ''");
+  await ensureColumn("AppRelease", "productionDeployRequested", "ALTER TABLE \"AppRelease\" ADD COLUMN \"productionDeployRequested\" BOOLEAN NOT NULL DEFAULT false");
   await prismaWithRaw.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS \"AuditEvent_organizationId_timestamp_idx\" ON \"AuditEvent\"(\"organizationId\", \"timestamp\")");
   await prismaWithRaw.$executeRawUnsafe("DROP TRIGGER IF EXISTS \"AuditEvent_no_update\"");
   await prismaWithRaw.$executeRawUnsafe(`
@@ -160,6 +165,40 @@ export const ensureDatabaseInitialized = async () => {
     BEFORE DELETE ON "DocumentVersion"
     BEGIN
       SELECT RAISE(ABORT, 'document_versions do not allow hard delete');
+    END
+  `);
+  await prismaWithRaw.$executeRawUnsafe("DROP TRIGGER IF EXISTS \"DocumentVersion_no_content_update_when_approved\"");
+  await prismaWithRaw.$executeRawUnsafe(`
+    CREATE TRIGGER "DocumentVersion_no_content_update_when_approved"
+    BEFORE UPDATE ON "DocumentVersion"
+    WHEN OLD."state" = 'APPROVED' AND NEW."contentSnapshot" <> OLD."contentSnapshot"
+    BEGIN
+      SELECT RAISE(ABORT, 'approved document_versions are immutable');
+    END
+  `);
+  await prismaWithRaw.$executeRawUnsafe("DROP TRIGGER IF EXISTS \"GeneratedDocument_no_content_update_when_approved\"");
+  await prismaWithRaw.$executeRawUnsafe(`
+    CREATE TRIGGER "GeneratedDocument_no_content_update_when_approved"
+    BEFORE UPDATE ON "GeneratedDocument"
+    WHEN OLD."status" = 'APPROVED' AND NEW."currentContent" <> OLD."currentContent"
+    BEGIN
+      SELECT RAISE(ABORT, 'approved generated_documents are immutable');
+    END
+  `);
+  await prismaWithRaw.$executeRawUnsafe("DROP TRIGGER IF EXISTS \"DocumentExport_no_update\"");
+  await prismaWithRaw.$executeRawUnsafe(`
+    CREATE TRIGGER "DocumentExport_no_update"
+    BEFORE UPDATE ON "DocumentExport"
+    BEGIN
+      SELECT RAISE(ABORT, 'document_exports are immutable');
+    END
+  `);
+  await prismaWithRaw.$executeRawUnsafe("DROP TRIGGER IF EXISTS \"DocumentExport_no_delete\"");
+  await prismaWithRaw.$executeRawUnsafe(`
+    CREATE TRIGGER "DocumentExport_no_delete"
+    BEFORE DELETE ON "DocumentExport"
+    BEGIN
+      SELECT RAISE(ABORT, 'document_exports are immutable');
     END
   `);
   await prismaWithRaw.$executeRawUnsafe("DROP TRIGGER IF EXISTS \"AppRelease_no_update_after_signature\"");
@@ -245,6 +284,28 @@ export const ensureDatabaseInitialized = async () => {
   `);
   await prismaWithRaw.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS \"AccessReviewReport_organizationId_createdAt_idx\" ON \"AccessReviewReport\"(\"organizationId\", \"createdAt\")");
   await prismaWithRaw.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "AuditVerificationReport" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "organizationId" TEXT NOT NULL,
+      "actorUserId" TEXT NOT NULL,
+      "verifiedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "rangeStart" DATETIME,
+      "rangeEnd" DATETIME,
+      "checkedEvents" INTEGER NOT NULL,
+      "chainHeadStored" TEXT,
+      "chainHeadComputed" TEXT,
+      "pass" BOOLEAN NOT NULL,
+      "firstBrokenEventId" TEXT,
+      "failureReason" TEXT,
+      "reportJson" TEXT NOT NULL,
+      "reportHash" TEXT NOT NULL,
+      "signature" TEXT NOT NULL,
+      "reportPath" TEXT NOT NULL,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await prismaWithRaw.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS \"AuditVerificationReport_organizationId_createdAt_idx\" ON \"AuditVerificationReport\"(\"organizationId\", \"createdAt\")");
+  await prismaWithRaw.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "AppRelease" (
       "id" TEXT NOT NULL PRIMARY KEY,
       "organizationId" TEXT NOT NULL,
@@ -252,6 +313,10 @@ export const ensureDatabaseInitialized = async () => {
       "releaseDate" DATETIME NOT NULL,
       "changeSummary" TEXT NOT NULL,
       "riskImpact" TEXT NOT NULL,
+      "buildHash" TEXT NOT NULL DEFAULT '',
+      "sbomHash" TEXT NOT NULL DEFAULT '',
+      "testResultsSummaryHash" TEXT NOT NULL DEFAULT '',
+      "productionDeployRequested" BOOLEAN NOT NULL DEFAULT false,
       "approvedSignatureId" TEXT,
       "approvedByUserId" TEXT,
       "deployedAt" DATETIME,

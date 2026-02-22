@@ -5,14 +5,16 @@ import { ensureDatabaseInitialized } from "@/server/db/bootstrap";
 import { getRequiredEnv } from "@/server/config/env";
 import { provisionDeployment } from "@/server/setup/provision";
 import { getPasswordPolicyErrors, hashPassword } from "@/server/auth/password";
+import { runWithoutOrgScope } from "@/server/db/org-scope-context";
 
 export async function POST(request: Request) {
-  const env = getRequiredEnv();
-  await ensureDatabaseInitialized();
-  const count = await prisma.organization.count();
-  if (count > 0) {
-    return apiJson(409, { error: "Setup is already completed for this deployment." });
-  }
+  return await runWithoutOrgScope(async () => {
+    const env = getRequiredEnv();
+    await ensureDatabaseInitialized();
+    const count = await prisma.organization.count();
+    if (count > 0) {
+      return apiJson(409, { error: "Setup is already completed for this deployment." });
+    }
 
   const body = (await request.json()) as {
     organizationName?: string;
@@ -59,8 +61,9 @@ export async function POST(request: Request) {
     request
   });
 
-  return apiJson(201, {
-    organization: { id: organization.id, name: organization.name },
-    admin: { id: admin.id, email: admin.email, fullName: admin.fullName, role: admin.role }
+    return apiJson(201, {
+      organization: { id: organization.id, name: organization.name },
+      admin: { id: admin.id, email: admin.email, fullName: admin.fullName, role: admin.role }
+    });
   });
 }

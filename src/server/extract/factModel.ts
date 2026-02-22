@@ -1,4 +1,5 @@
-﻿import type { CitationChunk } from "@/server/parsers/pdfParser";
+import type { CitationChunk } from "@/server/parsers/pdfParser";
+import { validateFactModel } from "@/server/extract/factModelSchema";
 
 export type FactModel = {
   intendedUse: string | null;
@@ -56,7 +57,7 @@ export const extractFactModel = (sourceDocumentId: string, chunks: CitationChunk
       .filter((value, index, arr) => arr.indexOf(value) === index);
   };
 
-  return {
+  return validateFactModel({
     intendedUse,
     coreFunctions: pullKeywords(["mixing", "heating", "cooling", "sterilization", "agitation"]),
     utilities: pullKeywords(["steam", "water", "air", "nitrogen", "power"]),
@@ -66,5 +67,6 @@ export const extractFactModel = (sourceDocumentId: string, chunks: CitationChunk
     softwareVersion: versionLine,
     processRanges,
     citations
-  };
+  });
 };
+

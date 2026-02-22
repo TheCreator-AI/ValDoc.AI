@@ -65,6 +65,8 @@ export type SignatureRow = {
   meaning: string;
   signedAt: string;
   recordHash: string;
+  authMethod?: string;
+  remarks?: string | null;
 };
 
 export type DocxExportModel = {
@@ -254,13 +256,15 @@ export const buildDocxExportModel = (params: BuildDocxModelParams): DocxExportMo
   sections.push({
     heading: "Signature Page",
     paragraphs: signatures.length === 0 ? ["No signatures recorded for this version."] : [],
-    tableColumns: ["signer_name", "user_id", "meaning", "signed_at", "record_hash"],
+    tableColumns: ["signer_name", "user_id", "meaning", "signed_at", "record_hash", "auth_method", "remarks"],
     tableRows: signatures.map((signature) => [
       signature.signerFullName,
       signature.signerUserId,
       signature.meaning,
       signature.signedAt,
-      signature.recordHash
+      signature.recordHash,
+      signature.authMethod ?? "",
+      signature.remarks ?? ""
     ])
   });
 

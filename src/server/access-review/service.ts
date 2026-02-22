@@ -2,7 +2,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { compare } from "bcryptjs";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db/prisma";
 import { hashRecordContent } from "@/server/signatures/manifest";
 import { ApiError } from "@/server/api/http";
@@ -222,7 +221,7 @@ export const getAccessReviewReportForDownload = async (params: {
 };
 
 export const createAccessReviewAttestationRecord = async (params: {
-  tx: Prisma.TransactionClient;
+  tx: AccessReviewAttestationTx;
   organizationId: string;
   actor: { userId: string; fullName: string };
   report: { id: string; reportHash: string };
@@ -326,3 +325,27 @@ export const attestAccessReviewReport = async (params: {
   };
 };
 
+type AccessReviewAttestationTx = {
+  electronicSignature: {
+    create: (args: {
+      data: {
+        organizationId: string;
+        recordType: string;
+        recordId: string;
+        recordVersionId: string;
+        signerUserId: string;
+        signerFullName: string;
+        meaning: "APPROVE";
+        authMethod: string;
+        signatureManifest: string;
+        remarks: string | null;
+      };
+    }) => Promise<{ id: string }>;
+  };
+  accessReviewReport: {
+    update: (args: {
+      where: { id: string };
+      data: { attestedSignatureId: string; attestedAt: Date };
+    }) => Promise<unknown>;
+  };
+};

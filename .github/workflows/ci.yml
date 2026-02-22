@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  test-and-quality:
+  ci-gates:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: file:./prisma/dev.db
@@ -24,46 +24,86 @@ jobs:
           cache: npm
 
       - name: Install dependencies
+        id: install
         run: npm ci
 
-      - name: Test
-        run: npm test
-
-      - name: Lint
-        run: npm run lint
+      - name: Compose security guardrails
+        id: compose_guardrails
+        run: npm run config:compose:check
 
       - name: Typecheck
+        id: typecheck
         run: npm run typecheck
 
-  security-gates:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - name: Lint
+        id: lint
+        run: npm run lint
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+      - name: Unit + integration tests
+        id: tests
+        run: npm test
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Dependency vulnerability scan (policy: fail on high/critical)
+        id: dep_scan
+        run: |
+          mkdir -p artifacts
+          npm audit --omit=dev --audit-level=high --json > artifacts/npm-audit.json
 
-      - name: Dependency audit (high+)
-        run: npm run security:audit
-
-      - name: Setup Semgrep
-        uses: semgrep/setup-semgrep@v1
-
-      - name: Semgrep SAST (error severity)
-        run: npm run security:sast
-
-      - name: Gitleaks scan
+      - name: Secrets scan
+        id: secrets_scan
         uses: gitleaks/gitleaks-action@v2
         env:
           GITLEAKS_CONFIG: .gitleaks.toml
+
+      - name: Setup Semgrep (SAST)
+        id: semgrep_setup
+        uses: semgrep/setup-semgrep@v1
+
+      - name: Semgrep SAST (error severity)
+        id: semgrep
+        run: npm run security:sast
+
+      - name: Generate SBOM
+        id: sbom
+        run: |
+          mkdir -p artifacts
+          npx @cyclonedx/cyclonedx-npm --output-format json --output-file artifacts/sbom.cdx.json
+
+      - name: Build Evidence
+        if: always()
+        run: |
+          mkdir -p artifacts
+          cat > artifacts/build-evidence.md <<'EOF'
+          # Build Evidence
+
+          - Workflow: ${{ github.workflow }}
+          - Run ID: ${{ github.run_id }}
+          - Run Number: ${{ github.run_number }}
+          - Commit: ${{ github.sha }}
+          - Ref: ${{ github.ref }}
+          - UTC: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          ## Gate Results
+          - Install: ${{ steps.install.outcome }}
+          - Compose Guardrails: ${{ steps.compose_guardrails.outcome }}
+          - Typecheck: ${{ steps.typecheck.outcome }}
+          - Lint: ${{ steps.lint.outcome }}
+          - Unit+Integration Tests: ${{ steps.tests.outcome }}
+          - Dependency Vulnerability Scan (high/critical): ${{ steps.dep_scan.outcome }}
+          - Secret Scan: ${{ steps.secrets_scan.outcome }}
+          - Semgrep SAST: ${{ steps.semgrep.outcome }}
+          - SBOM Generation: ${{ steps.sbom.outcome }}
+
+          ## Policy
+          - Dependency gate fails on vulnerabilities with severity >= high.
+          - Secrets gate fails on any detected leak.
+          - Typecheck/lint/tests are mandatory.
+          EOF
+
+      - name: Upload Build Evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-evidence-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: error

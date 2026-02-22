@@ -98,4 +98,11 @@ describe("getSessionOrThrow session controls", () => {
       expect.objectContaining({ where: { id: "sess1" }, data: { lastActivityAt: expect.any(Date) } })
     );
   });
+
+  it("rejects revoked sessions", async () => {
+    mocks.userSessionFindFirst.mockResolvedValueOnce(null);
+
+    await expect(getSessionOrThrow()).rejects.toMatchObject({ status: 401 });
+    expect(mocks.writeAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: "auth.session.invalid" }));
+  });
 });

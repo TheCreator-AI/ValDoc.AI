@@ -4,6 +4,7 @@ import { prisma } from "@/server/db/prisma";
 import { apiJson } from "@/server/api/http";
 import { getPasswordPolicyErrors, hashPassword } from "@/server/auth/password";
 import { writeAuditEvent } from "@/server/audit/events";
+import { runWithoutOrgScope } from "@/server/db/org-scope-context";
 
 const resetSchema = z.object({
   organizationId: z.string().min(1, "organizationId is required."),
@@ -13,8 +14,9 @@ const resetSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  try {
-    const body = resetSchema.parse(await request.json());
+  return await runWithoutOrgScope(async () => {
+    try {
+      const body = resetSchema.parse(await request.json());
 
     const organization = await prisma.organization.findFirst({
       where: { id: body.organizationId, isActive: true },
@@ -87,11 +89,12 @@ export async function POST(request: Request) {
       request
     }).catch(() => undefined);
 
-    return apiJson(200, { ok: true });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return apiJson(400, { error: error.issues[0]?.message ?? "Invalid payload." });
+      return apiJson(200, { ok: true });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return apiJson(400, { error: error.issues[0]?.message ?? "Invalid payload." });
+      }
+      return apiJson(500, { error: "Failed to reset password." });
     }
-    return apiJson(500, { error: "Failed to reset password." });
-  }
+  });
 }

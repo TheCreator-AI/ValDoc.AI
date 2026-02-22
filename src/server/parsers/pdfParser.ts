@@ -1,3 +1,5 @@
+import { sanitizeUntrustedDocumentText } from "@/server/security/promptGuardrails";
+
 export type CitationChunk = {
   page: number;
   section: string;
@@ -26,14 +28,14 @@ export const parseSourceDocument = async (buffer: Buffer, mimeType: string) => {
   if (mimeType === "application/pdf") {
     // Stub-safe PDF parsing for MVP portability across environments.
     // Replace with page-aware parser (pdfjs/Document AI) for production citations.
-    const text = buffer.toString("latin1");
+    const text = sanitizeUntrustedDocumentText(buffer.toString("latin1"));
     return {
       fullText: text,
       chunks: splitIntoChunks(text, 1)
     };
   }
 
-  const text = buffer.toString("utf8");
+  const text = sanitizeUntrustedDocumentText(buffer.toString("utf8"));
   return {
     fullText: text,
     chunks: splitIntoChunks(text, 1)

@@ -34,14 +34,51 @@ const canonicalize = (value: unknown): string => {
   return `{${segments.join(",")}}`;
 };
 
+const normalizeText = (value: string | null) => (value ?? "").normalize("NFC").replace(/\r\n/g, "\n");
+
+const canonicalizePossiblyJson = (value: string | null) => {
+  const normalized = normalizeText(value);
+  if (!normalized) return "";
+  try {
+    return canonicalize(JSON.parse(normalized));
+  } catch {
+    return normalized;
+  }
+};
+
+const canonicalizeEventEnvelope = (prevHash: string, payload: AuditChainEventPayload) => {
+  const envelope = {
+    version: 1,
+    prevHash: normalizeText(prevHash),
+    organizationId: normalizeText(payload.organizationId),
+    actorUserId: normalizeText(payload.actorUserId),
+    action: normalizeText(payload.action),
+    entityType: normalizeText(payload.entityType),
+    entityId: normalizeText(payload.entityId),
+    outcome: normalizeText(payload.outcome),
+    timestampIso: normalizeText(payload.timestampIso),
+    ip: normalizeText(payload.ip),
+    userAgent: normalizeText(payload.userAgent),
+    metadataJson: canonicalizePossiblyJson(payload.metadataJson),
+    detailsJson: canonicalizePossiblyJson(payload.detailsJson)
+  };
+  return canonicalize(envelope);
+};
+
 export const computeEventHash = (prevHash: string, payload: AuditChainEventPayload) => {
-  const canonicalPayload = canonicalize(payload);
-  return createHash("sha256").update(`${prevHash}${canonicalPayload}`).digest("hex");
+  const canonicalPayload = canonicalizeEventEnvelope(prevHash, payload);
+  return createHash("sha256").update(Buffer.from(canonicalPayload, "utf8")).digest("hex");
 };
 
 export const verifyAuditChain = (events: AuditChainRow[]) => {
+  let chainOrgId: string | null = null;
   let expectedPrev = "";
   for (const event of events) {
+    if (!chainOrgId) {
+      chainOrgId = event.payload.organizationId;
+    } else if (event.payload.organizationId !== chainOrgId) {
+      return { ok: false, brokenEventId: event.id, reason: "organization_mismatch" as const };
+    }
     const actualPrev = event.prevHash ?? "";
     if (actualPrev !== expectedPrev) {
       return { ok: false, brokenEventId: event.id, reason: "prev_hash_mismatch" as const };

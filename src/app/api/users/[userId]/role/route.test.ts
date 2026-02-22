@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getSessionOrThrowWithPermission: vi.fn(),
   userFindFirst: vi.fn(),
   userUpdate: vi.fn(),
+  userSessionUpdateMany: vi.fn(),
   writeAuditEvent: vi.fn()
 }));
 
@@ -22,6 +23,9 @@ vi.mock("@/server/db/prisma", () => ({
     user: {
       findFirst: mocks.userFindFirst,
       update: mocks.userUpdate
+    },
+    userSession: {
+      updateMany: mocks.userSessionUpdateMany
     }
   }
 }));
@@ -52,6 +56,7 @@ describe("PATCH /api/users/:userId/role", () => {
       fullName: "Emily",
       role: "REVIEWER"
     });
+    mocks.userSessionUpdateMany.mockResolvedValue({ count: 2 });
   });
 
   it("updates role and writes audit event", async () => {
@@ -72,6 +77,39 @@ describe("PATCH /api/users/:userId/role", () => {
         entityId: "u2"
       })
     );
+    expect(mocks.userSessionUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ organizationId: "org1", userId: "u2", revokedAt: null }),
+        data: expect.objectContaining({ revokedAt: expect.any(Date) })
+      })
+    );
+  });
+
+  it("does not rotate sessions when role is unchanged", async () => {
+    mocks.userFindFirst.mockResolvedValueOnce({
+      id: "u2",
+      organizationId: "org1",
+      role: "REVIEWER",
+      email: "emily@qp.org"
+    });
+    mocks.userUpdate.mockResolvedValueOnce({
+      id: "u2",
+      email: "emily@qp.org",
+      fullName: "Emily",
+      role: "REVIEWER"
+    });
+
+    const response = await PATCH(
+      new Request("http://localhost/api/users/u2/role", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ role: "REVIEWER" })
+      }),
+      { params: Promise.resolve({ userId: "u2" }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.userSessionUpdateMany).not.toHaveBeenCalled();
   });
 
   it("denies reviewer from changing user roles", async () => {

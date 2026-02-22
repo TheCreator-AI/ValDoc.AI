@@ -1,6 +1,7 @@
 import type { DocType } from "@prisma/client";
 import { prisma } from "@/server/db/prisma";
 import { hashPayload } from "@/server/verification/generator";
+import { ApiError } from "@/server/api/http";
 
 export const persistGeneratedPayload = async (params: {
   organizationId: string;
@@ -43,26 +44,35 @@ export const persistGeneratedPayload = async (params: {
     }
   });
 
-  const document = existing
-    ? await prisma.generatedDocument.update({
-        where: { id: existing.id },
-        data: {
-          currentContent: content,
-          citationsJson,
-          stage: params.stage ?? "PRE_EXECUTION"
-        }
-      })
-    : await prisma.generatedDocument.create({
-        data: {
-          organizationId: params.organizationId,
-          generationJobId: job.id,
-          docType: params.docType,
-          stage: params.stage ?? "PRE_EXECUTION",
-          title: params.title,
-          currentContent: content,
-          citationsJson
-        }
-      });
+  let document;
+  if (existing) {
+    if (existing.status === "APPROVED") {
+      throw new ApiError(
+        409,
+        "Approved records are immutable. Create a new controlled record version before regeneration."
+      );
+    }
+    document = await prisma.generatedDocument.update({
+      where: { id: existing.id },
+      data: {
+        currentContent: content,
+        citationsJson,
+        stage: params.stage ?? "PRE_EXECUTION"
+      }
+    });
+  } else {
+    document = await prisma.generatedDocument.create({
+      data: {
+        organizationId: params.organizationId,
+        generationJobId: job.id,
+        docType: params.docType,
+        stage: params.stage ?? "PRE_EXECUTION",
+        title: params.title,
+        currentContent: content,
+        citationsJson
+      }
+    });
+  }
 
   const lastVersion = await prisma.documentVersion.findFirst({
     where: { generatedDocumentId: document.id },

@@ -13,14 +13,20 @@ export type AuthPolicy = {
   sessionMaxAgeSeconds: number;
   idleTimeoutSeconds: number;
   requireAdminMfa: boolean;
+  requirePrivilegedMfa: boolean;
 };
 
 export const getAuthPolicy = (): AuthPolicy => {
+  const isProduction = (process.env.NODE_ENV ?? "development") === "production";
+  const requirePrivilegedMfaRaw = process.env.REQUIRE_PRIVILEGED_MFA;
+  const requirePrivilegedMfa =
+    requirePrivilegedMfaRaw === undefined ? isProduction : requirePrivilegedMfaRaw.toLowerCase() === "true";
   return {
     lockoutThreshold: parsePositiveInt(process.env.AUTH_LOCKOUT_THRESHOLD, 10),
     passwordMaxAgeDays: parsePositiveInt(process.env.PASSWORD_MAX_AGE_DAYS, 180),
     sessionMaxAgeSeconds: parsePositiveInt(process.env.SESSION_MAX_AGE_SECONDS, 8 * 60 * 60),
     idleTimeoutSeconds: parsePositiveInt(process.env.SESSION_IDLE_TIMEOUT_SECONDS, 30 * 60),
-    requireAdminMfa: (process.env.REQUIRE_ADMIN_MFA ?? "false").toLowerCase() === "true"
+    requireAdminMfa: (process.env.REQUIRE_ADMIN_MFA ?? "false").toLowerCase() === "true",
+    requirePrivilegedMfa
   };
 };

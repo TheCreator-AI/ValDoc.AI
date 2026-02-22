@@ -31,7 +31,14 @@ docker compose up -d
 
 Optional profiles:
 - OpenSearch: `docker compose --profile search up -d`
+- OpenSearch (dev-only insecure mode): `docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile search-dev up -d`
 - MinIO object storage: `docker compose --profile object-storage up -d`
+
+Production indexing notes:
+- Keep OpenSearch on private networking only (no public exposure).
+- Keep OpenSearch security plugin enabled.
+- Inject `OPENSEARCH_USERNAME` / `OPENSEARCH_PASSWORD` from a secrets manager.
+- See `docs/opensearch-production-hardening.md`.
 
 ## 4) Run Database Migrations
 ```bash

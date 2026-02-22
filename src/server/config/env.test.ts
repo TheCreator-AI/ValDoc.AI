@@ -70,4 +70,104 @@ describe("env config guard", () => {
 
     expect(logger).toHaveBeenCalledWith(expect.stringContaining("Config validation executed"));
   });
+
+  it("rejects production startup when OpenSearch security is disabled", () => {
+    expect(() =>
+      validateStartupConfig({
+        DATABASE_URL: "file:./dev.db",
+        JWT_SECRET: "super-long-test-secret-0123456789",
+        CUSTOMER_ID: "qa-org",
+        ORG_NAME: "QA Organization",
+        NODE_ENV: "production",
+        ENABLE_OPENSEARCH: "true",
+        OPENSEARCH_SECURITY_DISABLED: "true"
+      })
+    ).toThrow(/OpenSearch security must be enabled/);
+  });
+
+  it("rejects production startup when OpenSearch uses non-TLS URL", () => {
+    expect(() =>
+      validateStartupConfig({
+        DATABASE_URL: "file:./dev.db",
+        JWT_SECRET: "super-long-test-secret-0123456789",
+        CUSTOMER_ID: "qa-org",
+        ORG_NAME: "QA Organization",
+        NODE_ENV: "production",
+        ENABLE_OPENSEARCH: "true",
+        OPENSEARCH_SECURITY_DISABLED: "false",
+        OPENSEARCH_URL: "http://opensearch.internal:9200",
+        OPENSEARCH_USERNAME: "valdoc-indexer",
+        OPENSEARCH_PASSWORD: "very-strong-password"
+      })
+    ).toThrow(/OpenSearch URL must use https/i);
+  });
+
+  it("rejects production startup when OpenSearch least-privilege credentials are missing", () => {
+    expect(() =>
+      validateStartupConfig({
+        DATABASE_URL: "file:./dev.db",
+        JWT_SECRET: "super-long-test-secret-0123456789",
+        CUSTOMER_ID: "qa-org",
+        ORG_NAME: "QA Organization",
+        NODE_ENV: "production",
+        ENABLE_OPENSEARCH: "true",
+        OPENSEARCH_SECURITY_DISABLED: "false",
+        OPENSEARCH_URL: "https://opensearch.internal:9200"
+      })
+    ).toThrow(/OpenSearch credentials are required/i);
+  });
+
+  it("rejects production startup when backup encryption key is missing", () => {
+    expect(() =>
+      validateStartupConfig({
+        DATABASE_URL: "file:./dev.db",
+        JWT_SECRET: "super-long-test-secret-0123456789",
+        CUSTOMER_ID: "qa-org",
+        ORG_NAME: "QA Organization",
+        NODE_ENV: "production",
+        BACKUP_ENCRYPTION_KEY: ""
+      })
+    ).toThrow(/BACKUP_ENCRYPTION_KEY/);
+  });
+
+  it("rejects production startup when backup encryption key is weak", () => {
+    expect(() =>
+      validateStartupConfig({
+        DATABASE_URL: "file:./dev.db",
+        JWT_SECRET: "super-long-test-secret-0123456789",
+        CUSTOMER_ID: "qa-org",
+        ORG_NAME: "QA Organization",
+        NODE_ENV: "production",
+        BACKUP_ENCRYPTION_KEY: "changeme"
+      })
+    ).toThrow(/BACKUP_ENCRYPTION_KEY/);
+  });
+
+  it("rejects startup when idle timeout is greater than absolute session max age", () => {
+    expect(() =>
+      validateStartupConfig({
+        DATABASE_URL: "file:./dev.db",
+        JWT_SECRET: "super-long-test-secret-0123456789",
+        CUSTOMER_ID: "qa-org",
+        ORG_NAME: "QA Organization",
+        SESSION_MAX_AGE_SECONDS: "1800",
+        SESSION_IDLE_TIMEOUT_SECONDS: "3600"
+      })
+    ).toThrow(/SESSION_IDLE_TIMEOUT_SECONDS/);
+  });
+
+  it("rejects production startup when session max age is unreasonably long", () => {
+    expect(() =>
+      validateStartupConfig({
+        DATABASE_URL: "file:./dev.db",
+        JWT_SECRET: "super-long-test-secret-0123456789",
+        CUSTOMER_ID: "qa-org",
+        ORG_NAME: "QA Organization",
+        NODE_ENV: "production",
+        BACKUP_ENCRYPTION_KEY: "super-long-backup-encryption-key-0123456789",
+        SESSION_MAX_AGE_SECONDS: "172801",
+        SESSION_IDLE_TIMEOUT_SECONDS: "1800"
+      })
+    ).toThrow(/SESSION_MAX_AGE_SECONDS/);
+  });
 });

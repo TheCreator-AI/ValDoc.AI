@@ -2,6 +2,7 @@ import { ApiError, apiJson, getSessionOrThrow } from "@/server/api/http";
 import { writeAuditEvent } from "@/server/audit/events";
 import { fileToResponse } from "@/server/export/packageExporter";
 import { exportEvidencePackage } from "@/server/evidence/exporter";
+import { checkAndConsumeRateLimit } from "@/server/security/rateLimit";
 
 const parseDateRange = (request: Request) => {
   const url = new URL(request.url);
@@ -25,6 +26,14 @@ const parseDateRange = (request: Request) => {
 export async function POST(request: Request) {
   try {
     const session = await getSessionOrThrow("ADMIN");
+    const rateLimit = checkAndConsumeRateLimit({
+      key: `evidence-export:${session.organizationId}:${session.userId}`,
+      limit: 10,
+      windowMs: 10 * 60 * 1000
+    });
+    if (!rateLimit.allowed) {
+      return apiJson(429, { error: "Evidence export rate limit exceeded. Please retry later." });
+    }
     const { from, to } = parseDateRange(request);
     const exported = await exportEvidencePackage({
       organizationId: session.organizationId,

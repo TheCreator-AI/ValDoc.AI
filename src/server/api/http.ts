@@ -1,9 +1,11 @@
 import { cookies } from "next/headers";
+import { randomUUID } from "node:crypto";
 import { verifySessionToken } from "@/server/auth/token";
 import { hasPermission, hasRole, type Permission, type Role } from "@/server/auth/rbac";
 import { ensureDatabaseInitialized } from "@/server/db/bootstrap";
 import { prisma } from "@/server/db/prisma";
 import { writeAuditEvent } from "@/server/audit/events";
+import { setRequestOrgContext } from "@/server/db/org-scope-context";
 
 export class ApiError extends Error {
   status: number;
@@ -41,6 +43,11 @@ export const getSessionOrThrow = async (minimumRole?: Role) => {
   }
 
   const session = await verifySessionToken(token);
+  setRequestOrgContext({
+    organizationId: session.organizationId,
+    actorUserId: session.userId,
+    requestId: randomUUID()
+  });
   const organization = await prisma.organization.findFirst({
     where: { id: session.organizationId, isActive: true },
     select: { id: true }
@@ -166,6 +173,12 @@ export const assertPermissionOrThrow = async (params: {
 
 export const getSessionOrThrowWithPermission = async (request: Request, permission: Permission) => {
   const session = await getSessionOrThrow();
+  setRequestOrgContext({
+    organizationId: session.organizationId,
+    actorUserId: session.userId,
+    requestId: request.headers.get("x-request-id") ?? randomUUID(),
+    endpoint: new URL(request.url).pathname
+  });
   await assertPermissionOrThrow({ session, permission, request });
   return session;
 };

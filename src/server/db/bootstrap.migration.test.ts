@@ -35,5 +35,9 @@ describe("migration bootstrap", () => {
     expect(calls.some((statement) => statement.includes("CREATE TRIGGER \"DocumentVersion_no_delete\""))).toBe(true);
     expect(calls.some((statement) => statement.includes("CREATE TRIGGER \"AppRelease_no_update_after_signature\""))).toBe(true);
     expect(calls.some((statement) => statement.includes("CREATE TRIGGER \"AppRelease_no_delete\""))).toBe(true);
+    expect(calls.some((statement) => statement.includes("ALTER TABLE \"AppRelease\" ADD COLUMN \"buildHash\""))).toBe(true);
+    expect(calls.some((statement) => statement.includes("ALTER TABLE \"AppRelease\" ADD COLUMN \"sbomHash\""))).toBe(true);
+    expect(calls.some((statement) => statement.includes("ALTER TABLE \"AppRelease\" ADD COLUMN \"testResultsSummaryHash\""))).toBe(true);
+    expect(calls.some((statement) => statement.includes("ALTER TABLE \"AppRelease\" ADD COLUMN \"productionDeployRequested\""))).toBe(true);
   });
 });

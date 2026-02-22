@@ -13,6 +13,13 @@ const transitionMatrix: Record<DocumentVersionState, DocumentVersionState[]> = {
   OBSOLETE: []
 };
 
+const transitionRolePolicy: Record<DocumentVersionState, Role[]> = {
+  DRAFT: ["ADMIN", "REVIEWER", "APPROVER", "AUTHOR", "ENGINEER"],
+  IN_REVIEW: ["ADMIN", "REVIEWER", "APPROVER", "AUTHOR", "ENGINEER"],
+  APPROVED: ["ADMIN", "REVIEWER", "APPROVER"],
+  OBSOLETE: ["ADMIN", "REVIEWER", "APPROVER"]
+};
+
 const allowsObsoleteWithJustification = () => (process.env.ALLOW_OBSOLETE_WITH_JUSTIFICATION ?? "true").toLowerCase() !== "false";
 
 export const createDocumentVersion = async (params: {
@@ -105,6 +112,11 @@ export const transitionDocumentVersionState = async (params: {
     throw new ApiError(404, "Document version not found.");
   }
 
+  const allowedRoles = transitionRolePolicy[params.toState] ?? [];
+  if (!allowedRoles.includes(params.actorRole)) {
+    throw new ApiError(403, `Role ${params.actorRole} is not permitted to transition to ${params.toState}.`);
+  }
+
   const allowedTargets = transitionMatrix[version.state];
   if (!allowedTargets.includes(params.toState)) {
     throw new ApiError(409, `Invalid transition: ${version.state} -> ${params.toState}.`);
@@ -119,9 +131,18 @@ export const transitionDocumentVersionState = async (params: {
   }
 
   if (params.toState === "APPROVED") {
-    if (params.actorRole !== "REVIEWER" && params.actorRole !== "ADMIN") {
-      throw new ApiError(403, "Only Reviewer/Admin can approve document versions.");
+    const latestVersion = await prisma.documentVersion.findFirst({
+      where: {
+        generatedDocumentId: params.documentId,
+        generatedDocument: { organizationId: params.organizationId }
+      },
+      orderBy: { versionNumber: "desc" },
+      select: { id: true }
+    });
+    if (!latestVersion || latestVersion.id !== version.id) {
+      throw new ApiError(409, "Only the latest version can be moved to APPROVED.");
     }
+
     const segregation = evaluateApprovalSegregation({
       actorRole: params.actorRole,
       actorUserId: params.actorUserId,

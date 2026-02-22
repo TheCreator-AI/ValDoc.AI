@@ -9,6 +9,10 @@ type ReleasePayload = {
   releaseDate: Date;
   changeSummary: string;
   riskImpact: string;
+  buildHash: string;
+  sbomHash: string;
+  testResultsSummaryHash: string;
+  productionDeployRequested: boolean;
   deployedAt: Date | null;
 };
 
@@ -18,6 +22,10 @@ export const createReleaseEntry = async (params: {
   payload: ReleasePayload;
   request?: Request;
 }) => {
+  if (params.payload.productionDeployRequested) {
+    throw new ApiError(409, "Production deploy flag requires approval signature.");
+  }
+
   const created = await prisma.appRelease.create({
     data: {
       organizationId: params.organizationId,
@@ -25,6 +33,10 @@ export const createReleaseEntry = async (params: {
       releaseDate: params.payload.releaseDate,
       changeSummary: params.payload.changeSummary,
       riskImpact: params.payload.riskImpact,
+      buildHash: params.payload.buildHash,
+      sbomHash: params.payload.sbomHash,
+      testResultsSummaryHash: params.payload.testResultsSummaryHash,
+      productionDeployRequested: params.payload.productionDeployRequested,
       deployedAt: params.payload.deployedAt,
       createdByUserId: params.actorUserId
     }
@@ -52,6 +64,10 @@ export const updateReleaseEntry = async (params: {
   patch: {
     changeSummary?: string;
     riskImpact?: string;
+    buildHash?: string;
+    sbomHash?: string;
+    testResultsSummaryHash?: string;
+    productionDeployRequested?: boolean;
     deployedAt?: Date | null;
   };
   request?: Request;
@@ -73,6 +89,9 @@ export const updateReleaseEntry = async (params: {
 
   if (existing.approvedSignatureId) {
     throw new ApiError(409, "Signed release entries are immutable.");
+  }
+  if (params.patch.productionDeployRequested === true) {
+    throw new ApiError(409, "Production deploy flag requires approval signature.");
   }
 
   const updated = await prisma.appRelease.update({
@@ -112,6 +131,10 @@ export const signReleaseEntry = async (params: {
       releaseDate: true,
       changeSummary: true,
       riskImpact: true,
+      buildHash: true,
+      sbomHash: true,
+      testResultsSummaryHash: true,
+      productionDeployRequested: true,
       deployedAt: true,
       approvedSignatureId: true
     }
@@ -163,6 +186,10 @@ export const signReleaseEntry = async (params: {
       releaseDate: release.releaseDate.toISOString(),
       changeSummary: release.changeSummary,
       riskImpact: release.riskImpact,
+      buildHash: release.buildHash,
+      sbomHash: release.sbomHash,
+      testResultsSummaryHash: release.testResultsSummaryHash,
+      productionDeployRequested: release.productionDeployRequested,
       deployedAt: release.deployedAt?.toISOString() ?? null
     })
   );
@@ -188,6 +215,7 @@ export const signReleaseEntry = async (params: {
       data: {
         approvedSignatureId: signature.id,
         approvedByUserId: params.actorUserId,
+        productionDeployRequested: true,
         deployedAt: release.deployedAt ?? new Date()
       }
     });

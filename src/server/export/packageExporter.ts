@@ -6,6 +6,7 @@ import { ZipFile } from "yazl";
 import PDFDocument from "pdfkit/js/pdfkit.standalone.js";
 import { prisma } from "@/server/db/prisma";
 import { buildDocxExportModel, renderDefaultDocx, type SignatureRow } from "@/server/export/defaultDocxRenderer";
+import { assertExportPayloadValid } from "@/server/export/exportValidation";
 import { ensureStoragePathIsSafe } from "@/server/files/storage";
 
 const outputDir = path.resolve(process.cwd(), "storage", "exports");
@@ -63,6 +64,12 @@ const buildSignaturePageLines = (signatures: SignatureRow[]) => {
     lines.push(`Meaning: ${signature.meaning}`);
     lines.push(`Signed At: ${signature.signedAt}`);
     lines.push(`Record Hash: ${signature.recordHash}`);
+    if (signature.authMethod) {
+      lines.push(`Auth Method: ${signature.authMethod}`);
+    }
+    if (signature.remarks) {
+      lines.push(`Remarks: ${signature.remarks}`);
+    }
     lines.push("");
   }
   return lines;
@@ -157,6 +164,7 @@ export const exportDocumentAsPdfWithMetadata = async (params: {
     }
   };
   const hash = document.versions[0]?.contentHash ?? createHash("sha256").update(document.currentContent).digest("hex");
+  assertExportPayloadValid(document.docType, docPayload);
   const signatures = await prisma.electronicSignature.findMany({
     where: {
       organizationId: params.organizationId,
@@ -171,7 +179,9 @@ export const exportDocumentAsPdfWithMetadata = async (params: {
     signerUserId: signature.signerUserId,
     meaning: signature.meaning,
     signedAt: signature.signedAt.toISOString(),
-    recordHash: signature.signatureManifest
+    recordHash: signature.signatureManifest,
+    authMethod: signature.authMethod,
+    remarks: signature.remarks
   }));
   const model = buildDocxExportModel({
     docType: document.docType,
@@ -270,6 +280,7 @@ export const exportDocumentAsDocxWithMetadata = async (params: {
     }
   };
   const hash = document.versions[0]?.contentHash ?? createHash("sha256").update(document.currentContent).digest("hex");
+  assertExportPayloadValid(document.docType, docPayload);
   const signatures = await prisma.electronicSignature.findMany({
     where: {
       organizationId: params.organizationId,
@@ -284,7 +295,9 @@ export const exportDocumentAsDocxWithMetadata = async (params: {
     signerUserId: signature.signerUserId,
     meaning: signature.meaning,
     signedAt: signature.signedAt.toISOString(),
-    recordHash: signature.signatureManifest
+    recordHash: signature.signatureManifest,
+    authMethod: signature.authMethod,
+    remarks: signature.remarks
   }));
   const rendered = await renderDefaultDocx({
     docType: document.docType,

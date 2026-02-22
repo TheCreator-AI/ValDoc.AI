@@ -1,0 +1,664 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+  APPROVER
+  AUTHOR
+  REVIEWER
+  VIEWER
+  ENGINEER
+}
+
+enum SourceType {
+  MANUAL
+  DATASHEET
+  DRAWING
+  SOP
+  CLIENT_CRITERIA
+  SITE_STANDARD
+  TEMPLATE
+}
+
+enum DocType {
+  URS
+  SIA
+  RID
+  DIA
+  IOQ
+  OQ
+  EXECUTED_PROTOCOL
+  PROTOCOL_SUMMARY
+  SUMMARY
+  TRACEABILITY
+}
+
+enum DocumentStage {
+  PRE_EXECUTION
+  EXECUTION
+  POST_EXECUTION
+}
+
+enum ExecutedDocumentType {
+  VENDOR_DOCUMENT
+  VENDOR_IOQ
+  OWNER_IOQ
+  EXECUTED_PROTOCOL
+  OTHER
+}
+
+enum TemplateStatus {
+  DRAFT
+  APPROVED
+  RETIRED
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  COMPLETE
+  FAILED
+}
+
+enum ReviewStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum DocumentVersionState {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  OBSOLETE
+}
+
+enum AuditOutcome {
+  SUCCESS
+  DENIED
+}
+
+enum SignatureMeaning {
+  AUTHOR
+  REVIEW
+  APPROVE
+}
+
+enum UserAccountStatus {
+  ACTIVE
+  LOCKED
+}
+
+model Organization {
+  id          String             @id @default(cuid())
+  name        String
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  users       User[]
+  machines    Machine[]
+  templates   DocumentTemplate[]
+  sources     SourceDocument[]
+  jobs        GenerationJob[]
+  documents   GeneratedDocument[]
+  exports     DocumentExport[]
+  traceLinks  TraceabilityLink[]
+  labGroups   LabGroup[]
+  changeControls ChangeControl[]
+  machineVendorDocuments MachineVendorDocument[]
+  unitExecutedDocuments UnitExecutedDocument[]
+  unitGroups UnitGroup[]
+  equipmentFacts EquipmentFact[]
+  auditEvents AuditEvent[]
+  signatures ElectronicSignature[]
+  auditChainHead AuditChainHead?
+  retentionPolicy RetentionPolicy?
+  legalHolds LegalHold[]
+  purgeRuns RetentionPurgeRun[]
+  accessReviewReports AccessReviewReport[]
+  sessions UserSession[]
+  appReleases AppRelease[]
+  auditVerificationReports AuditVerificationReport[]
+}
+
+model DeploymentConfig {
+  id         String   @id
+  customerId String   @unique
+  orgName    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model DeploymentRole {
+  id          String   @id @default(cuid())
+  name        Role     @unique
+  description String
+  createdAt   DateTime @default(now())
+}
+
+model User {
+  id             String        @id @default(cuid())
+  organizationId String
+  email          String        @unique
+  passwordHash   String
+  fullName       String
+  role           Role
+  userStatus     UserAccountStatus @default(ACTIVE)
+  mfaEnabled     Boolean       @default(false)
+  lastLoginAt    DateTime?
+  failedLoginAttempts Int      @default(0)
+  lockedAt        DateTime?
+  passwordUpdatedAt DateTime   @default(now())
+  createdAt      DateTime      @default(now())
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sessions       UserSession[]
+  documentVersions DocumentVersion[]
+  exports       DocumentExport[]     @relation("DocumentExportCreator")
+  equipmentFacts EquipmentFact[]
+  auditEvents AuditEvent[]
+  signatures   ElectronicSignature[] @relation("ElectronicSignatureSigner")
+  legalHoldsCreated LegalHold[] @relation("LegalHoldCreatedBy")
+  legalHoldsReleased LegalHold[] @relation("LegalHoldReleasedBy")
+  purgeRuns RetentionPurgeRun[] @relation("RetentionPurgeRunActor")
+  accessReviewReports AccessReviewReport[] @relation("AccessReviewReportCreator")
+  appReleasesCreated AppRelease[] @relation("AppReleaseCreator")
+  appReleasesApproved AppRelease[] @relation("AppReleaseApprover")
+  auditVerificationReports AuditVerificationReport[] @relation("AuditVerificationReportActor")
+}
+
+model Machine {
+  id               String           @id @default(cuid())
+  organizationId   String
+  name             String
+  modelNumber      String
+  manufacturer     String
+  equipmentFactModel String?
+  createdAt        DateTime         @default(now())
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sourceDocuments  SourceDocument[]
+  jobs             GenerationJob[]
+  changeControls   ChangeControl[]
+  units            Unit[]
+  unitGroups       UnitGroup[]
+  vendorDocuments  MachineVendorDocument[]
+  equipmentFacts   EquipmentFact[]
+}
+
+model EquipmentFact {
+  id             String        @id @default(cuid())
+  organizationId String
+  machineId      String
+  factType       String
+  key            String
+  value          String
+  units          String?
+  sourceRef      String?
+  confidence     Float?
+  createdBy      String
+  createdAt      DateTime      @default(now())
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  machine        Machine       @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  creator        User          @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, machineId, factType])
+}
+
+model AuditEvent {
+  id             String        @id @default(cuid())
+  organizationId String
+  actorUserId    String
+  action         String
+  entityType     String
+  entityId       String
+  outcome        AuditOutcome  @default(SUCCESS)
+  metadataJson   String?
+  detailsJson    String?
+  prevHash       String?
+  eventHash      String?
+  timestamp      DateTime      @default(now())
+  ip             String?
+  userAgent      String?
+  createdAt      DateTime      @default(now())
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor          User          @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+  changes        AuditEventDetail[]
+
+  @@index([organizationId, entityType, entityId])
+  @@index([organizationId, timestamp])
+}
+
+model AuditChainHead {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  headHash       String?
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model AuditEventDetail {
+  id         String     @id @default(cuid())
+  eventId    String
+  changePath String
+  oldValue   String?
+  newValue   String?
+  createdAt  DateTime   @default(now())
+  event      AuditEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model Unit {
+  id             String        @id @default(cuid())
+  organizationId String
+  machineId      String
+  unitGroupId    String?
+  unitCode       String
+  serialNumber   String?
+  location       String?
+  procurementDate DateTime?
+  calibrationDate DateTime?
+  calibrationDueDate DateTime?
+  pmPlanNumber   String?
+  status         String        @default("ACTIVE")
+  createdAt      DateTime      @default(now())
+  machine        Machine       @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  unitGroup      UnitGroup?    @relation(fields: [unitGroupId], references: [id], onDelete: SetNull)
+  executedDocuments UnitExecutedDocument[]
+
+  @@unique([machineId, unitCode])
+}
+
+model UnitGroup {
+  id             String        @id @default(cuid())
+  organizationId String
+  machineId      String
+  name           String
+  description    String?
+  createdAt      DateTime      @default(now())
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  machine        Machine       @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  units          Unit[]
+
+  @@unique([machineId, name])
+}
+
+model MachineVendorDocument {
+  id             String      @id @default(cuid())
+  organizationId String
+  machineId      String
+  title          String
+  documentType   String      @default("VENDOR_REFERENCE")
+  fileName       String
+  filePath       String
+  mimeType       String
+  createdAt      DateTime    @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  machine        Machine     @relation(fields: [machineId], references: [id], onDelete: Cascade)
+}
+
+model UnitExecutedDocument {
+  id             String              @id @default(cuid())
+  organizationId String
+  unitId         String
+  title          String
+  documentType   ExecutedDocumentType
+  fileName       String
+  filePath       String
+  mimeType       String
+  createdAt      DateTime            @default(now())
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  unit           Unit                @relation(fields: [unitId], references: [id], onDelete: Cascade)
+}
+
+model LabGroup {
+  id             String           @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  createdAt      DateTime         @default(now())
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  impactedBy     ChangeControlLabImpact[]
+
+  @@unique([organizationId, name])
+}
+
+model SourceDocument {
+  id               String           @id @default(cuid())
+  organizationId   String
+  machineId        String?
+  uploadedByUserId String?
+  fileName         String
+  filePath         String
+  mimeType         String
+  sourceType       SourceType
+  extractedText    String?
+  citationsJson    String?
+  createdAt        DateTime         @default(now())
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  machine          Machine?         @relation(fields: [machineId], references: [id], onDelete: SetNull)
+  chunks           SourceChunk[]
+}
+
+model SourceChunk {
+  id               String          @id @default(cuid())
+  sourceDocumentId String
+  organizationId   String
+  pageNumber       Int
+  sectionLabel     String
+  chunkText        String
+  createdAt        DateTime        @default(now())
+  sourceDocument   SourceDocument  @relation(fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, sectionLabel])
+}
+
+model DocumentTemplate {
+  id               String          @id @default(cuid())
+  organizationId   String
+  templateId       String
+  version          Int             @default(1)
+  status           TemplateStatus  @default(DRAFT)
+  effectiveDate    DateTime?
+  createdByUserId  String?
+  approvedByUserId String?
+  approvedAt       DateTime?
+  docType          DocType
+  title            String
+  contentTemplate  String
+  templateKind     String          @default("EXAMPLE")
+  isPrimary        Boolean         @default(false)
+  sourceFileName   String?
+  sourceFilePath   String?
+  sourceMimeType   String?
+  createdAt        DateTime        @default(now())
+  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, templateId, version])
+  @@index([organizationId, docType, status, approvedAt])
+}
+
+model GenerationJob {
+  id               String            @id @default(cuid())
+  organizationId   String
+  machineId        String
+  createdByUserId  String
+  status           JobStatus         @default(QUEUED)
+  startedAt        DateTime?
+  completedAt      DateTime?
+  metadataJson     String?
+  createdAt        DateTime          @default(now())
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  machine          Machine           @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  documents        GeneratedDocument[]
+}
+
+model GeneratedDocument {
+  id               String            @id @default(cuid())
+  organizationId   String
+  generationJobId  String
+  templateId       String?
+  templateVersion  Int?
+  templateRecordId String?
+  docType          DocType
+  stage            DocumentStage      @default(PRE_EXECUTION)
+  title            String
+  status           ReviewStatus      @default(DRAFT)
+  currentContent   String
+  citationsJson    String?
+  deletedAt        DateTime?
+  createdAt        DateTime          @default(now())
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  generationJob    GenerationJob     @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+  versions         DocumentVersion[]
+  traceLinks       TraceabilityLink[]
+  exports          DocumentExport[]
+}
+
+model ChangeControl {
+  id                  String                @id @default(cuid())
+  organizationId      String
+  machineId           String?
+  requestedByUserId   String
+  qaApprovedByUserId  String?
+  title               String
+  description         String
+  changeType          String
+  status              String                @default("DRAFT")
+  riskAssessment      String?
+  systemImpactSummary String?
+  requiresRevalidation Boolean              @default(false)
+  revalidationPlan    String?
+  trainingPlan        String?
+  implementationNotes String?
+  createdAt           DateTime              @default(now())
+  approvedAt          DateTime?
+  organization        Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  machine             Machine?              @relation(fields: [machineId], references: [id], onDelete: SetNull)
+  impacts             ChangeControlLabImpact[]
+}
+
+model ChangeControlLabImpact {
+  id              String         @id @default(cuid())
+  changeControlId String
+  labGroupId      String
+  impactLevel     String         @default("MEDIUM")
+  impactSummary   String?
+  createdAt       DateTime       @default(now())
+  changeControl   ChangeControl  @relation(fields: [changeControlId], references: [id], onDelete: Cascade)
+  labGroup        LabGroup       @relation(fields: [labGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([changeControlId, labGroupId])
+}
+
+model DocumentVersion {
+  id               String            @id @default(cuid())
+  generatedDocumentId String
+  editedByUserId   String
+  versionNumber    Int
+  state            DocumentVersionState @default(DRAFT)
+  contentSnapshot  String
+  contentHash      String?
+  signatureManifest String?
+  supersedesVersionId String?
+  changeComment    String?
+  changeReason     String?
+  deletedAt        DateTime?
+  createdAt        DateTime          @default(now())
+  generatedDocument GeneratedDocument @relation(fields: [generatedDocumentId], references: [id], onDelete: Cascade)
+  editedBy         User              @relation(fields: [editedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([generatedDocumentId, versionNumber])
+  @@index([generatedDocumentId, state])
+}
+
+model RetentionPolicy {
+  id                           String       @id @default(cuid())
+  organizationId               String       @unique
+  auditEventRetentionDays      Int?
+  documentVersionRetentionDays Int?
+  legalHoldEnabled             Boolean      @default(true)
+  createdAt                    DateTime     @default(now())
+  updatedAt                    DateTime     @updatedAt
+  organization                 Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model LegalHold {
+  id               String       @id @default(cuid())
+  organizationId   String
+  recordType       String
+  recordId         String
+  recordVersionId  String?
+  reason           String?
+  isActive         Boolean      @default(true)
+  createdByUserId  String
+  releasedByUserId String?
+  createdAt        DateTime     @default(now())
+  releasedAt       DateTime?
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy        User         @relation("LegalHoldCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  releasedBy       User?        @relation("LegalHoldReleasedBy", fields: [releasedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, recordType, recordId, isActive])
+}
+
+model RetentionPurgeRun {
+  id             String       @id @default(cuid())
+  organizationId String
+  actorUserId    String
+  dryRun         Boolean      @default(true)
+  reportJson     String
+  reportHash     String
+  signature      String
+  reportPath     String
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor          User         @relation("RetentionPurgeRunActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+}
+
+model ElectronicSignature {
+  id                String           @id @default(cuid())
+  organizationId    String
+  recordType        String
+  recordId          String
+  recordVersionId   String
+  signerUserId      String
+  signerFullName    String
+  meaning           SignatureMeaning
+  signedAt          DateTime         @default(now())
+  authMethod        String           @default("PASSWORD_REAUTH")
+  signatureManifest String
+  remarks           String?
+  createdAt         DateTime         @default(now())
+  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  signer            User             @relation("ElectronicSignatureSigner", fields: [signerUserId], references: [id], onDelete: Cascade)
+  appReleaseApprovals AppRelease[]
+
+  @@index([organizationId, recordType, recordId, recordVersionId])
+  @@index([organizationId, signedAt])
+}
+
+model AppRelease {
+  id                 String               @id @default(cuid())
+  organizationId     String
+  buildVersion       String
+  releaseDate        DateTime
+  changeSummary      String
+  riskImpact         String
+  buildHash          String               @default("")
+  sbomHash           String               @default("")
+  testResultsSummaryHash String           @default("")
+  productionDeployRequested Boolean       @default(false)
+  approvedSignatureId String?
+  approvedByUserId   String?
+  deployedAt         DateTime?
+  createdByUserId    String
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy          User                 @relation("AppReleaseCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  approvedBy         User?                @relation("AppReleaseApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  approvedSignature  ElectronicSignature? @relation(fields: [approvedSignatureId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, buildVersion])
+  @@index([organizationId, releaseDate])
+}
+
+model TraceabilityLink {
+  id               String            @id @default(cuid())
+  organizationId   String
+  generatedDocumentId String
+  requirementId    String
+  riskControlId    String
+  testCaseId       String
+  citationSourceId String?
+  citationPage     Int?
+  createdAt        DateTime          @default(now())
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  generatedDocument GeneratedDocument @relation(fields: [generatedDocumentId], references: [id], onDelete: Cascade)
+}
+
+model DocumentExport {
+  id             String            @id @default(cuid())
+  exportId       String            @unique
+  organizationId String
+  docId          String
+  hash           String
+  path           String
+  format         String
+  createdBy      String
+  createdAt      DateTime          @default(now())
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  generatedDocument GeneratedDocument @relation(fields: [docId], references: [id], onDelete: Cascade)
+  creator        User              @relation("DocumentExportCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, docId, createdAt])
+}
+
+model AccessReviewReport {
+  id                  String        @id @default(cuid())
+  organizationId      String
+  generatedByUserId   String
+  reportJson          String
+  reportHash          String
+  reportPath          String
+  reportFormat        String        @default("csv")
+  attestedSignatureId String?
+  attestedAt          DateTime?
+  createdAt           DateTime      @default(now())
+  organization        Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  generator           User          @relation("AccessReviewReportCreator", fields: [generatedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+}
+
+model AuditVerificationReport {
+  id                String       @id @default(cuid())
+  organizationId    String
+  actorUserId       String
+  verifiedAt        DateTime     @default(now())
+  rangeStart        DateTime?
+  rangeEnd          DateTime?
+  checkedEvents     Int
+  chainHeadStored   String?
+  chainHeadComputed String?
+  pass              Boolean
+  firstBrokenEventId String?
+  failureReason     String?
+  reportJson        String
+  reportHash        String
+  signature         String
+  reportPath        String
+  createdAt         DateTime     @default(now())
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor             User         @relation("AuditVerificationReportActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+}
+
+
+model UserSession {
+  id                 String       @id @default(cuid())
+  organizationId     String
+  userId             String
+  lastActivityAt     DateTime
+  idleTimeoutSeconds Int          @default(1800)
+  expiresAt          DateTime
+  revokedAt          DateTime?
+  ip                 String?
+  userAgent          String?
+  createdAt          DateTime     @default(now())
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, userId, createdAt])
+  @@index([organizationId, revokedAt, expiresAt])
+}

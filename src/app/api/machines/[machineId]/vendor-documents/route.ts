@@ -37,9 +37,16 @@ export async function GET(_request: Request, context: { params: Promise<{ machin
 }
 
 export async function POST(request: Request, context: { params: Promise<{ machineId: string }> }) {
+  let sessionRef: { organizationId: string; userId: string } | null = null;
+  let machineIdRef = "";
+  let titleRef = "";
+  let documentTypeRef = "VENDOR_REFERENCE";
+  let fileNameRef = "";
   try {
     const session = await getSessionOrThrow("ENGINEER");
+    sessionRef = { organizationId: session.organizationId, userId: session.userId };
     const { machineId } = await context.params;
+    machineIdRef = machineId;
 
     const machine = await prisma.machine.findFirst({
       where: {
@@ -56,10 +63,13 @@ export async function POST(request: Request, context: { params: Promise<{ machin
     const file = formData.get("file");
     const title = String(formData.get("title") ?? "").trim();
     const documentType = String(formData.get("documentType") ?? "VENDOR_REFERENCE").trim();
+    titleRef = title;
+    documentTypeRef = documentType;
 
     if (!(file instanceof File)) {
       return apiJson(400, { error: "file is required." });
     }
+    fileNameRef = file.name;
 
     const stored = await saveUploadedFile(file, { kind: "VENDOR_DOCUMENT" });
 
@@ -87,7 +97,31 @@ export async function POST(request: Request, context: { params: Promise<{ machin
 
     return apiJson(201, created);
   } catch (error) {
-    if (error instanceof ApiError) return apiJson(error.status, { error: error.message });
+    if (error instanceof ApiError) {
+      if (sessionRef) {
+        try {
+          await writeAuditEvent({
+            organizationId: sessionRef.organizationId,
+            actorUserId: sessionRef.userId,
+            action: "document.upload.vendor",
+            entityType: "MachineVendorDocument",
+            entityId: machineIdRef || "unknown",
+            outcome: "DENIED",
+            details: {
+              machineId: machineIdRef || null,
+              title: titleRef || null,
+              documentType: documentTypeRef,
+              fileName: fileNameRef || null,
+              reason: error.message
+            },
+            request
+          });
+        } catch {
+          // swallow audit failures for response path
+        }
+      }
+      return apiJson(error.status, { error: error.message });
+    }
     return apiJson(500, { error: "Failed to upload vendor document." });
   }
 }

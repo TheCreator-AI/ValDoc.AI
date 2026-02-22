@@ -8,6 +8,7 @@ The application writes append-only security events to `AuditEvent` for:
 - export/download endpoints
 - user role changes
 - upload/delete operations for governed files
+- tamper-evidence report generation/download (`audit.verify_chain.report.*`)
 
 ## Data Captured
 - `timestamp`
@@ -50,6 +51,15 @@ The application writes append-only security events to `AuditEvent` for:
   - `UPDATE`/`DELETE` permissions on `AuditEvent` and `AuditEventDetail`
 - For SQLite MVP, trigger-based immutability enforces append-only behavior.
 - For production RDBMS, enforce least-privilege grants in addition to triggers/policies.
+
+Postgres example (application role `valdoc_app`):
+
+```sql
+REVOKE UPDATE, DELETE ON TABLE "AuditEvent" FROM valdoc_app;
+REVOKE UPDATE, DELETE ON TABLE "AuditEventDetail" FROM valdoc_app;
+GRANT SELECT, INSERT ON TABLE "AuditEvent" TO valdoc_app;
+GRANT SELECT, INSERT ON TABLE "AuditEventDetail" TO valdoc_app;
+```
 
 ## Retention Notes
 Configured via environment:

@@ -8,6 +8,7 @@ import { writeAuditEvent } from "@/server/audit/events";
 import { isSystemOwnerEmail } from "@/server/auth/systemOwner";
 import { getAuthPolicy } from "@/server/auth/policy";
 import { checkAndConsumeRateLimit } from "@/server/security/rateLimit";
+import { runWithoutOrgScope } from "@/server/db/org-scope-context";
 
 const getClientIp = (request: Request) => {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -23,9 +24,10 @@ const isPasswordExpired = (passwordUpdatedAt: Date | null, maxAgeDays: number) =
 };
 
 export async function POST(request: Request) {
-  await ensureDatabaseInitialized();
-  const body = (await request.json()) as { organizationId?: string; email?: string; password?: string };
-  const authPolicy = getAuthPolicy();
+  return await runWithoutOrgScope(async () => {
+    await ensureDatabaseInitialized();
+    const body = (await request.json()) as { organizationId?: string; email?: string; password?: string };
+    const authPolicy = getAuthPolicy();
 
   if (!body.organizationId || !body.email || !body.password) {
     return apiJson(400, { error: "Organization, email, and password are required." });
@@ -257,22 +259,23 @@ export async function POST(request: Request) {
     request
   }).catch(() => undefined);
 
-  return new Response(
-    JSON.stringify({
-      user: {
-        id: user.id,
-        organizationId: body.organizationId,
-        role: user.role,
-        email: user.email,
-        fullName: user.fullName
+    return new Response(
+      JSON.stringify({
+        user: {
+          id: user.id,
+          organizationId: body.organizationId,
+          role: user.role,
+          email: user.email,
+          fullName: user.fullName
+        }
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Set-Cookie": buildSessionCookieHeader({ token, maxAgeSeconds: authPolicy.sessionMaxAgeSeconds })
+        }
       }
-    }),
-    {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Set-Cookie": buildSessionCookieHeader({ token, maxAgeSeconds: authPolicy.sessionMaxAgeSeconds })
-      }
-    }
-  );
+    );
+  });
 }

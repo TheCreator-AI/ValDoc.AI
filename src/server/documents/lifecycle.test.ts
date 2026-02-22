@@ -124,6 +124,19 @@ describe("document lifecycle service", () => {
     ).rejects.toBeInstanceOf(ApiError);
   });
 
+  it("rejects transition when actor role is not allowed for target state", async () => {
+    await expect(
+      transitionDocumentVersionState({
+        organizationId: "org1",
+        documentId: "d1",
+        versionId: "v2",
+        actorUserId: "u1",
+        actorRole: "VIEWER",
+        toState: "IN_REVIEW"
+      })
+    ).rejects.toBeInstanceOf(ApiError);
+  });
+
   it("blocks obsolete transition without replacement or justification", async () => {
     mocks.versionFindFirst.mockResolvedValueOnce({
       id: "v2",
@@ -166,6 +179,52 @@ describe("document lifecycle service", () => {
         toState: "APPROVED"
       })
     ).resolves.toBeTruthy();
+  });
+
+  it("rejects APPROVED transition when version is not latest", async () => {
+    process.env.ENFORCE_TWO_PERSON_RULE = "false";
+    mocks.versionFindFirst
+      .mockResolvedValueOnce({
+        id: "v2",
+        versionNumber: 2,
+        state: "IN_REVIEW",
+        editedByUserId: "author1",
+        contentSnapshot: "{\"x\":1}",
+        changeComment: null
+      })
+      .mockResolvedValueOnce({ id: "v3" });
+
+    await expect(
+      transitionDocumentVersionState({
+        organizationId: "org1",
+        documentId: "d1",
+        versionId: "v2",
+        actorUserId: "u2",
+        actorRole: "REVIEWER",
+        toState: "APPROVED"
+      })
+    ).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it("locks content immutably after APPROVED by blocking successor draft creation", async () => {
+    mocks.versionFindFirst.mockResolvedValueOnce({
+      id: "v2",
+      versionNumber: 2,
+      state: "APPROVED",
+      editedByUserId: "author1",
+      contentSnapshot: "{\"x\":1}",
+      changeComment: null
+    });
+
+    await expect(
+      createDocumentVersion({
+        organizationId: "org1",
+        documentId: "d1",
+        actorUserId: "u1",
+        changeReason: "attempt edit after approval",
+        contentJson: "{\"x\":2}"
+      })
+    ).rejects.toBeInstanceOf(ApiError);
   });
 
   it("blocks same-user approval when two-person rule is enabled", async () => {

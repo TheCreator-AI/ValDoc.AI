@@ -26,13 +26,31 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
       select: { id: true, email: true, fullName: true, role: true }
     });
 
+    let rotatedSessions = 0;
+    if (target.role !== updated.role) {
+      const rotated = await prisma.userSession.updateMany({
+        where: {
+          organizationId: session.organizationId,
+          userId: updated.id,
+          revokedAt: null
+        },
+        data: { revokedAt: new Date() }
+      });
+      rotatedSessions = rotated.count;
+    }
+
     await writeAuditEvent({
       organizationId: session.organizationId,
       actorUserId: session.userId,
       action: "auth.role_change",
       entityType: "User",
       entityId: updated.id,
-      details: { previousRole: target.role, updatedRole: updated.role, email: updated.email },
+      details: {
+        previousRole: target.role,
+        updatedRole: updated.role,
+        email: updated.email,
+        rotatedSessions
+      },
       request
     });
 

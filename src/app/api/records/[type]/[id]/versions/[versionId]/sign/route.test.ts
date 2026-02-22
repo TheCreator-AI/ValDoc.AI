@@ -7,8 +7,10 @@ const mocks = vi.hoisted(() => ({
   signatureCreate: vi.fn(),
   versionUpdate: vi.fn(),
   compare: vi.fn(),
+  checkAndConsumeRateLimit: vi.fn(),
   writeAuditEvent: vi.fn(),
-  tx: vi.fn()
+  tx: vi.fn(),
+  transitionDocumentVersionState: vi.fn()
 }));
 
 vi.mock("@/server/api/http", async () => {
@@ -41,16 +43,26 @@ vi.mock("@/server/audit/events", () => ({
   writeAuditEvent: mocks.writeAuditEvent
 }));
 
+vi.mock("@/server/security/rateLimit", () => ({
+  checkAndConsumeRateLimit: mocks.checkAndConsumeRateLimit
+}));
+
+vi.mock("@/server/documents/lifecycle", () => ({
+  transitionDocumentVersionState: mocks.transitionDocumentVersionState
+}));
+
 import { POST } from "./route";
 
 describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
   const originalEnforceTwoPersonRule = process.env.ENFORCE_TWO_PERSON_RULE;
   const originalEmergencyOverride = process.env.EMERGENCY_APPROVAL_OVERRIDE_ENABLED;
+  const originalSignatureMfaCode = process.env.SIGNATURE_MFA_CODE;
 
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.ENFORCE_TWO_PERSON_RULE = originalEnforceTwoPersonRule;
     process.env.EMERGENCY_APPROVAL_OVERRIDE_ENABLED = originalEmergencyOverride;
+    process.env.SIGNATURE_MFA_CODE = originalSignatureMfaCode;
     mocks.getSessionOrThrow.mockResolvedValue({
       userId: "u1",
       organizationId: "org1",
@@ -60,13 +72,15 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
     mocks.userFindFirst.mockResolvedValue({
       id: "u1",
       fullName: "Reviewer User",
-      passwordHash: "hash"
+      passwordHash: "hash",
+      mfaEnabled: false
     });
     mocks.versionFindFirst.mockImplementation(async (args: { where?: { id?: string } }) => {
       if (args.where?.id === "v2") {
         return {
           id: "v2",
           versionNumber: 2,
+          state: "IN_REVIEW",
           editedByUserId: "author-2",
           contentSnapshot: "{\"a\":1}",
           contentHash: null,
@@ -84,6 +98,7 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
       };
     });
     mocks.compare.mockResolvedValue(true);
+    mocks.checkAndConsumeRateLimit.mockReturnValue({ allowed: true, remaining: 19, retryAfterSeconds: 0 });
     mocks.tx.mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) =>
       cb({
         electronicSignature: { create: mocks.signatureCreate },
@@ -93,6 +108,7 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
     );
     mocks.signatureCreate.mockResolvedValue({ id: "sig1" });
     mocks.versionUpdate.mockResolvedValue({ id: "v2", signatureManifest: "abc123", contentHash: "abc123" });
+    mocks.transitionDocumentVersionState.mockResolvedValue({ id: "v2", state: "APPROVED" });
   });
 
   it("rejects wrong password and audits denied attempt", async () => {
@@ -101,7 +117,7 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
       new Request("http://localhost", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ meaning: "APPROVE", password: "wrong" })
+        body: JSON.stringify({ meaning: "APPROVE", password: "wrong", remarks: "Approval attempt" })
       }),
       { params: Promise.resolve({ type: "generated-document", id: "d1", versionId: "v2" }) }
     );
@@ -115,12 +131,26 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
     );
   });
 
+  it("returns 429 when signature rate limit is exceeded", async () => {
+    mocks.checkAndConsumeRateLimit.mockReturnValueOnce({ allowed: false, remaining: 0, retryAfterSeconds: 60 });
+    const response = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meaning: "APPROVE", password: "wrong", remarks: "Approval attempt" })
+      }),
+      { params: Promise.resolve({ type: "generated-document", id: "d1", versionId: "v2" }) }
+    );
+    expect(response.status).toBe(429);
+  });
+
   it("rejects signing non-latest version", async () => {
     mocks.versionFindFirst.mockImplementation(async (args: { where?: { id?: string } }) => {
       if (args.where?.id === "v2") {
         return {
           id: "v2",
           versionNumber: 2,
+          state: "IN_REVIEW",
           editedByUserId: "author-2",
           contentSnapshot: "{\"a\":1}",
           contentHash: null,
@@ -134,7 +164,7 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
       new Request("http://localhost", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ meaning: "APPROVE", password: "Password123!" })
+        body: JSON.stringify({ meaning: "APPROVE", password: "Password123!", remarks: "Approval attempt" })
       }),
       { params: Promise.resolve({ type: "generated-document", id: "d1", versionId: "v2" }) }
     );
@@ -160,7 +190,7 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
       new Request("http://localhost", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ meaning: "APPROVE", password: "Password123!" })
+        body: JSON.stringify({ meaning: "APPROVE", password: "Password123!", remarks: "Approval attempt" })
       }),
       { params: Promise.resolve({ type: "generated-document", id: "d1", versionId: "v2" }) }
     );
@@ -184,6 +214,7 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
           contentSnapshot: "{\"a\":1}",
           contentHash: null,
           generatedDocumentId: "d1",
+          state: "DRAFT",
           generatedDocument: { id: "d1", organizationId: "org1", status: "DRAFT" }
         };
       }
@@ -194,7 +225,7 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
       new Request("http://localhost", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ meaning: "APPROVE", password: "Password123!" })
+        body: JSON.stringify({ meaning: "APPROVE", password: "Password123!", remarks: "Approval attempt" })
       }),
       { params: Promise.resolve({ type: "generated-document", id: "d1", versionId: "v2" }) }
     );
@@ -209,12 +240,10 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
   });
 
   it("creates signature for latest version with successful audit", async () => {
-    const txGeneratedUpdate = vi.fn();
     mocks.tx.mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) =>
       cb({
         electronicSignature: { create: mocks.signatureCreate },
-        documentVersion: { update: mocks.versionUpdate },
-        generatedDocument: { update: txGeneratedUpdate }
+        documentVersion: { update: mocks.versionUpdate }
       })
     );
 
@@ -230,10 +259,16 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
     expect(response.status).toBe(201);
     expect(mocks.signatureCreate).toHaveBeenCalled();
     expect(mocks.versionUpdate).toHaveBeenCalled();
-    expect(txGeneratedUpdate).toHaveBeenCalledWith({
-      where: { id: "d1" },
-      data: { status: "APPROVED" }
-    });
+    expect(mocks.transitionDocumentVersionState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: "org1",
+        documentId: "d1",
+        versionId: "v2",
+        actorUserId: "u1",
+        actorRole: "APPROVER",
+        toState: "APPROVED"
+      })
+    );
     expect(mocks.writeAuditEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "signature.attempt",
@@ -249,6 +284,7 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
         return {
           id: "v2",
           versionNumber: 2,
+          state: "IN_REVIEW",
           editedByUserId: "u1",
           contentSnapshot: "{\"a\":1}",
           contentHash: null,
@@ -262,7 +298,7 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
       new Request("http://localhost", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ meaning: "APPROVE", password: "Password123!" })
+        body: JSON.stringify({ meaning: "APPROVE", password: "Password123!", remarks: "Approval attempt" })
       }),
       { params: Promise.resolve({ type: "generated-document", id: "d1", versionId: "v2" }) }
     );
@@ -277,6 +313,7 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
         return {
           id: "v2",
           versionNumber: 2,
+          state: "IN_REVIEW",
           editedByUserId: "u1",
           contentSnapshot: "{\"a\":1}",
           contentHash: null,
@@ -291,7 +328,7 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
       new Request("http://localhost", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ meaning: "APPROVE", password: "Password123!" })
+        body: JSON.stringify({ meaning: "APPROVE", password: "Password123!", remarks: "Approval attempt" })
       }),
       { params: Promise.resolve({ type: "generated-document", id: "d1", versionId: "v2" }) }
     );
@@ -313,6 +350,7 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
         return {
           id: "v2",
           versionNumber: 2,
+          state: "IN_REVIEW",
           editedByUserId: "u1",
           contentSnapshot: "{\"a\":1}",
           contentHash: null,
@@ -329,6 +367,7 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
         body: JSON.stringify({
           meaning: "APPROVE",
           password: "Password123!",
+          remarks: "Emergency approval",
           emergency_override: true,
           override_justification: "Emergency release due to customer outage."
         })
@@ -350,6 +389,7 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
         body: JSON.stringify({
           meaning: "APPROVE",
           password: "Password123!",
+          remarks: "Approval attempt",
           signed_at: "1999-01-01T00:00:00.000Z"
         })
       }),
@@ -361,6 +401,47 @@ describe("POST /api/records/:type/:id/versions/:versionId/sign", () => {
       expect.objectContaining({
         data: expect.not.objectContaining({
           signedAt: "1999-01-01T00:00:00.000Z"
+        })
+      })
+    );
+  });
+
+  it("requires remarks for approve signatures", async () => {
+    const response = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meaning: "APPROVE", password: "Password123!" })
+      }),
+      { params: Promise.resolve({ type: "generated-document", id: "d1", versionId: "v2" }) }
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it("allows MFA re-authentication for signing when MFA is enabled", async () => {
+    process.env.SIGNATURE_MFA_CODE = "123456";
+    mocks.userFindFirst.mockResolvedValueOnce({
+      id: "u1",
+      fullName: "Reviewer User",
+      passwordHash: "hash",
+      mfaEnabled: true
+    });
+    mocks.compare.mockResolvedValueOnce(false);
+
+    const response = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meaning: "APPROVE", mfa_code: "123456", remarks: "MFA approve" })
+      }),
+      { params: Promise.resolve({ type: "generated-document", id: "d1", versionId: "v2" }) }
+    );
+
+    expect(response.status).toBe(201);
+    expect(mocks.signatureCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          authMethod: "MFA_REAUTH"
         })
       })
     );

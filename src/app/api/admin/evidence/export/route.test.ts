@@ -5,7 +5,8 @@ const mocks = vi.hoisted(() => ({
   getSessionOrThrow: vi.fn(),
   exportEvidencePackage: vi.fn(),
   fileToResponse: vi.fn(),
-  writeAuditEvent: vi.fn()
+  writeAuditEvent: vi.fn(),
+  checkAndConsumeRateLimit: vi.fn()
 }));
 
 vi.mock("@/server/api/http", async () => {
@@ -28,6 +29,10 @@ vi.mock("@/server/audit/events", () => ({
   writeAuditEvent: mocks.writeAuditEvent
 }));
 
+vi.mock("@/server/security/rateLimit", () => ({
+  checkAndConsumeRateLimit: mocks.checkAndConsumeRateLimit
+}));
+
 import { POST } from "./route";
 
 describe("POST /api/admin/evidence/export", () => {
@@ -35,6 +40,7 @@ describe("POST /api/admin/evidence/export", () => {
     vi.clearAllMocks();
     mocks.fileToResponse.mockResolvedValue(new Response("ok"));
     mocks.writeAuditEvent.mockResolvedValue(undefined);
+    mocks.checkAndConsumeRateLimit.mockReturnValue({ allowed: true, remaining: 9, retryAfterSeconds: 0 });
   });
 
   it("enforces admin role", async () => {
@@ -74,5 +80,19 @@ describe("POST /api/admin/evidence/export", () => {
         outcome: "SUCCESS"
       })
     );
+  });
+
+  it("returns 429 when evidence export rate limit is exceeded", async () => {
+    mocks.getSessionOrThrow.mockResolvedValue({
+      userId: "u1",
+      organizationId: "org1",
+      role: "ADMIN"
+    });
+    mocks.checkAndConsumeRateLimit.mockReturnValueOnce({ allowed: false, remaining: 0, retryAfterSeconds: 60 });
+
+    const response = await POST(
+      new Request("http://localhost/api/admin/evidence/export?date_from=2026-01-01&date_to=2026-01-31")
+    );
+    expect(response.status).toBe(429);
   });
 });

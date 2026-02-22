@@ -78,6 +78,10 @@ Required variables:
 - `CUSTOMER_ID`
 - `ORG_NAME`
 
+Optional security tuning:
+- `ORG_BOUNDARY_ATTEMPT_LIMIT` (default `5`)
+- `ORG_BOUNDARY_ATTEMPT_WINDOW_MS` (default `300000`)
+
 Windows quick setup for persistent user-level vars:
 ```powershell
 setx DATABASE_URL "file:./dev.db"
@@ -179,7 +183,9 @@ Optional local seeded demo user (if `npm run db:seed`):
 - `GET /api/export/{jobId}?format=zip|docx|pdf`
 
 Full endpoint notes: `docs/api-definitions.md`.
+Cross-org API test coverage matrix: `docs/cross-org-test-coverage.md`.
 Production deployment controls: `docs/production-hardening-checklist.md`.
+Architecture and trust boundaries: `docs/architecture-trust-boundaries.md`.
 
 ## Testing and Quality Gates
 Run all checks:
@@ -190,10 +196,16 @@ npm run typecheck
 npm run secrets:scan
 ```
 
+CI-mode local regression (auto DB push + tests):
+```bash
+npm run test:ci
+```
+
 Security checks (same gates as CI):
 ```bash
 npm run security:audit
 npm run security:sast
+npm run security:sbom
 npm run secrets:scan
 ```
 
@@ -205,6 +217,12 @@ Run all security gates together:
 ```bash
 npm run security:check
 ```
+
+CI build evidence:
+- Every CI run uploads artifact `build-evidence-<run_id>` containing:
+  - `build-evidence.md` (gate outcomes + policy)
+  - `npm-audit.json`
+  - `sbom.cdx.json`
 
 Config validation command:
 ```bash
@@ -259,8 +277,20 @@ docker compose up -d
 Starts:
 - app (`localhost:3000`)
 - sqlite db sidecar volume service (`db`)
-- optional OpenSearch profile: `docker compose --profile search up -d`
+- optional secure OpenSearch profile (non-dev): `docker compose --profile search up -d`
+- optional dev-only OpenSearch profile with security plugin disabled:
+  `docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile search-dev up -d`
 - optional MinIO profile: `docker compose --profile object-storage up -d`
+
+Guardrails:
+- `npm run config:check` fails startup in production when `ENABLE_OPENSEARCH=true` and `OPENSEARCH_SECURITY_DISABLED=true`.
+- `npm run config:check` also fails production startup when:
+  - `OPENSEARCH_URL` is not `https://...`
+  - `OPENSEARCH_USERNAME` / `OPENSEARCH_PASSWORD` are missing while OpenSearch is enabled
+- `npm run config:compose:check` fails CI if non-dev compose files contain insecure OpenSearch settings.
+
+OpenSearch production hardening guidance:
+- `docs/opensearch-production-hardening.md`
 
 Health endpoint:
 ```bash
@@ -287,6 +317,7 @@ Provisioning guide:
 - `docs/provision-new-client-instance.md`
 - `docs/permission-matrix.md`
 - `docs/audit-trail.md`
+- `docs/postgres-deployment-guide.md`
 
 ## Rollback Steps
 1. Stop app/container.

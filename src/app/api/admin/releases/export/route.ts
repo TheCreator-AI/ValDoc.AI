@@ -20,6 +20,10 @@ export async function GET(request: Request) {
       "release_date",
       "change_summary",
       "risk_impact",
+      "build_hash",
+      "sbom_hash",
+      "test_results_summary_hash",
+      "production_deploy_requested",
       "approved_signature_id",
       "approved_by",
       "deployed_at"
@@ -30,6 +34,10 @@ export async function GET(request: Request) {
         toCsv(release.releaseDate.toISOString()),
         toCsv(release.changeSummary),
         toCsv(release.riskImpact),
+        toCsv(release.buildHash),
+        toCsv(release.sbomHash),
+        toCsv(release.testResultsSummaryHash),
+        toCsv(String(release.productionDeployRequested)),
         toCsv(release.approvedSignatureId),
         toCsv(release.approvedSignature?.signerFullName ?? null),
         toCsv(release.deployedAt?.toISOString() ?? null)

@@ -5,6 +5,10 @@ import { updateReleaseEntry } from "@/server/releases/service";
 const patchSchema = z.object({
   change_summary: z.string().min(1).optional(),
   risk_impact: z.string().min(1).optional(),
+  build_hash: z.string().min(1).optional(),
+  sbom_hash: z.string().min(1).optional(),
+  test_results_summary_hash: z.string().min(1).optional(),
+  production_deploy_requested: z.boolean().optional(),
   deployed_at: z.string().datetime().nullable().optional()
 });
 
@@ -20,6 +24,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ relea
       patch: {
         changeSummary: body.change_summary?.trim(),
         riskImpact: body.risk_impact?.trim(),
+        buildHash: body.build_hash?.trim(),
+        sbomHash: body.sbom_hash?.trim(),
+        testResultsSummaryHash: body.test_results_summary_hash?.trim(),
+        productionDeployRequested: body.production_deploy_requested,
         deployedAt: body.deployed_at === undefined ? undefined : body.deployed_at ? new Date(body.deployed_at) : null
       },
       request

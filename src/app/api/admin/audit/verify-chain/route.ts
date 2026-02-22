@@ -1,6 +1,7 @@
 import { prisma } from "@/server/db/prisma";
 import { ApiError, apiJson, getSessionOrThrowWithPermission } from "@/server/api/http";
 import { verifyAuditChain } from "@/server/audit/chain";
+import { generateTamperEvidenceReport } from "@/server/audit/verificationReport";
 
 export async function GET(request: Request) {
   try {
@@ -74,5 +75,25 @@ export async function GET(request: Request) {
       return apiJson(error.status, { error: error.message });
     }
     return apiJson(500, { error: "Failed to verify audit chain." });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const session = await getSessionOrThrowWithPermission(request, "audit.read");
+    const body = (await request.json().catch(() => ({}))) as { dateFrom?: string; dateTo?: string };
+    const generated = await generateTamperEvidenceReport({
+      organizationId: session.organizationId,
+      actorUserId: session.userId,
+      dateFrom: body.dateFrom,
+      dateTo: body.dateTo,
+      request
+    });
+    return apiJson(201, generated);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return apiJson(error.status, { error: error.message });
+    }
+    return apiJson(500, { error: "Failed to generate tamper-evidence report." });
   }
 }
