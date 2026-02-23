@@ -1,3 +1,5 @@
+import { parseFeatureFlags } from "@/server/config/features";
+
 type RawEnv = Record<string, string | undefined>;
 
 export type RequiredEnv = {
@@ -72,6 +74,7 @@ export const getRequiredEnv = () => validateRequiredEnv(process.env);
 
 export const validateStartupConfig = (raw: RawEnv, log: (line: string) => void = console.info) => {
   const env = validateRequiredEnv(raw);
+  const featureFlags = parseFeatureFlags(raw);
   const isProduction = (raw.NODE_ENV ?? "").trim().toLowerCase() === "production";
   const openSearchEnabled = isTrue(raw.ENABLE_OPENSEARCH);
   const openSearchSecurityDisabled = isTrue(raw.OPENSEARCH_SECURITY_DISABLED);
@@ -86,6 +89,7 @@ export const validateStartupConfig = (raw: RawEnv, log: (line: string) => void =
   const malwareScannerProvider = (raw.MALWARE_SCANNER_PROVIDER ?? "stub").trim().toLowerCase();
   const managedMalwareUrl = (raw.MANAGED_MALWARE_SCAN_URL ?? "").trim();
   const managedMalwareToken = (raw.MANAGED_MALWARE_SCAN_TOKEN ?? "").trim();
+  const auditChainVerifyCron = (raw.AUDIT_CHAIN_VERIFY_CRON ?? "").trim();
   const sessionMaxAgeSeconds = toPositiveIntOr(raw.SESSION_MAX_AGE_SECONDS, 8 * 60 * 60);
   const idleTimeoutSeconds = toPositiveIntOr(raw.SESSION_IDLE_TIMEOUT_SECONDS, 30 * 60);
 
@@ -102,6 +106,10 @@ export const validateStartupConfig = (raw: RawEnv, log: (line: string) => void =
     assertStrongSecret("OPENSEARCH_PASSWORD", openSearchPassword, 16);
   }
   if (isProduction) {
+    const databaseUrl = (env.DATABASE_URL ?? "").trim().toLowerCase();
+    if (!databaseUrl.startsWith("postgres://") && !databaseUrl.startsWith("postgresql://")) {
+      throw new Error("DATABASE_URL must use postgres:// or postgresql:// in production.");
+    }
     assertStrongSecret("BACKUP_ENCRYPTION_KEY", raw.BACKUP_ENCRYPTION_KEY, 32);
     if (!["redis", "gateway"].includes(rateLimitBackend)) {
       throw new Error("RATE_LIMIT_BACKEND must be set to 'redis' or 'gateway' in production.");
@@ -138,7 +146,11 @@ export const validateStartupConfig = (raw: RawEnv, log: (line: string) => void =
   if (idleTimeoutSeconds > sessionMaxAgeSeconds) {
     throw new Error("SESSION_IDLE_TIMEOUT_SECONDS must be less than or equal to SESSION_MAX_AGE_SECONDS.");
   }
+  if (isProduction && !auditChainVerifyCron) {
+    throw new Error("AUDIT_CHAIN_VERIFY_CRON is required in production.");
+  }
 
+  log(`Feature flags loaded: ${Object.entries(featureFlags).map(([key, value]) => `${key}=${value ? "on" : "off"}`).join(", ")}`);
   log(`Config validation executed for organization: ${env.ORG_NAME} (${env.CUSTOMER_ID}).`);
   return env;
 };

@@ -2,6 +2,7 @@ import { DocType } from "@prisma/client";
 import { prisma } from "@/server/db/prisma";
 import { ApiError, apiJson, getSessionOrThrow } from "@/server/api/http";
 import { buildTemplateSuggestions } from "@/server/templates/suggestions";
+import { isFeatureEnabled } from "@/server/config/features";
 
 const parseDocType = (value: string | null): DocType | null => {
   if (!value) return null;
@@ -12,6 +13,9 @@ const parseDocType = (value: string | null): DocType | null => {
 export async function GET(request: Request) {
   try {
     const session = await getSessionOrThrow();
+    if (!isFeatureEnabled("TEMPLATE_SUGGESTIONS")) {
+      return apiJson(404, { error: "Template suggestions are disabled for this deployment." });
+    }
     const { searchParams } = new URL(request.url);
     const docType = parseDocType(searchParams.get("docType"));
 

@@ -15,7 +15,7 @@ describe("env config guard", () => {
 
   it("returns normalized env when all required vars are present", () => {
     const env = validateRequiredEnv({
-      DATABASE_URL: "file:./dev.db",
+      DATABASE_URL: "postgresql://app:password@localhost/valdoc",
       JWT_SECRET: "super-long-test-secret-0123456789",
       CUSTOMER_ID: "qa-org",
       ORG_NAME: "QA Organization"
@@ -32,7 +32,7 @@ describe("env config guard", () => {
       CUSTOMER_ID: process.env.CUSTOMER_ID,
       ORG_NAME: process.env.ORG_NAME
     };
-    process.env.DATABASE_URL = "file:./dev.db";
+    process.env.DATABASE_URL = "postgresql://app:password@localhost/valdoc";
     process.env.JWT_SECRET = "super-long-test-secret-0123456789";
     process.env.CUSTOMER_ID = "qa-org";
     process.env.ORG_NAME = "QA Organization";
@@ -48,7 +48,7 @@ describe("env config guard", () => {
   it("throws when JWT secret is weak", () => {
     expect(() =>
       validateRequiredEnv({
-        DATABASE_URL: "file:./dev.db",
+        DATABASE_URL: "postgresql://app:password@localhost/valdoc",
         JWT_SECRET: "replace-with-long-random-secret",
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization"
@@ -60,7 +60,7 @@ describe("env config guard", () => {
     const logger = vi.fn();
     validateStartupConfig(
       {
-        DATABASE_URL: "file:./dev.db",
+        DATABASE_URL: "postgresql://app:password@localhost/valdoc",
         JWT_SECRET: "super-long-test-secret-0123456789",
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization"
@@ -74,7 +74,7 @@ describe("env config guard", () => {
   it("rejects production startup when OpenSearch security is disabled", () => {
     expect(() =>
       validateStartupConfig({
-        DATABASE_URL: "file:./dev.db",
+        DATABASE_URL: "postgresql://app:password@localhost/valdoc",
         JWT_SECRET: "super-long-test-secret-0123456789",
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
@@ -89,7 +89,7 @@ describe("env config guard", () => {
   it("rejects production startup when OpenSearch uses non-TLS URL", () => {
     expect(() =>
       validateStartupConfig({
-        DATABASE_URL: "file:./dev.db",
+        DATABASE_URL: "postgresql://app:password@localhost/valdoc",
         JWT_SECRET: "super-long-test-secret-0123456789",
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
@@ -107,7 +107,7 @@ describe("env config guard", () => {
   it("rejects production startup when OpenSearch least-privilege credentials are missing", () => {
     expect(() =>
       validateStartupConfig({
-        DATABASE_URL: "file:./dev.db",
+        DATABASE_URL: "postgresql://app:password@localhost/valdoc",
         JWT_SECRET: "super-long-test-secret-0123456789",
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
@@ -123,7 +123,7 @@ describe("env config guard", () => {
   it("rejects production startup when backup encryption key is missing", () => {
     expect(() =>
       validateStartupConfig({
-        DATABASE_URL: "file:./dev.db",
+        DATABASE_URL: "postgresql://app:password@localhost/valdoc",
         JWT_SECRET: "super-long-test-secret-0123456789",
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
@@ -137,7 +137,7 @@ describe("env config guard", () => {
   it("rejects production startup when backup encryption key is weak", () => {
     expect(() =>
       validateStartupConfig({
-        DATABASE_URL: "file:./dev.db",
+        DATABASE_URL: "postgresql://app:password@localhost/valdoc",
         JWT_SECRET: "super-long-test-secret-0123456789",
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
@@ -151,7 +151,7 @@ describe("env config guard", () => {
   it("rejects startup when idle timeout is greater than absolute session max age", () => {
     expect(() =>
       validateStartupConfig({
-        DATABASE_URL: "file:./dev.db",
+        DATABASE_URL: "postgresql://app:password@localhost/valdoc",
         JWT_SECRET: "super-long-test-secret-0123456789",
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
@@ -164,7 +164,7 @@ describe("env config guard", () => {
   it("rejects production startup when session max age is unreasonably long", () => {
     expect(() =>
       validateStartupConfig({
-        DATABASE_URL: "file:./dev.db",
+        DATABASE_URL: "postgresql://app:password@localhost/valdoc",
         JWT_SECRET: "super-long-test-secret-0123456789",
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
@@ -181,7 +181,7 @@ describe("env config guard", () => {
   it("rejects production startup when distributed rate limit backend is not configured", () => {
     expect(() =>
       validateStartupConfig({
-        DATABASE_URL: "file:./dev.db",
+        DATABASE_URL: "postgresql://app:password@localhost/valdoc",
         JWT_SECRET: "super-long-test-secret-0123456789",
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
@@ -196,7 +196,7 @@ describe("env config guard", () => {
   it("rejects production startup when default MinIO credentials are configured", () => {
     expect(() =>
       validateStartupConfig({
-        DATABASE_URL: "file:./dev.db",
+        DATABASE_URL: "postgresql://app:password@localhost/valdoc",
         JWT_SECRET: "super-long-test-secret-0123456789",
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
@@ -214,13 +214,14 @@ describe("env config guard", () => {
     const logger = vi.fn();
     validateStartupConfig(
       {
-        DATABASE_URL: "file:./dev.db",
+        DATABASE_URL: "postgresql://app:password@localhost/valdoc",
         JWT_SECRET: "super-long-test-secret-0123456789",
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
         NODE_ENV: "production",
         MALWARE_SCANNER_PROVIDER: "clamav",
         BACKUP_ENCRYPTION_KEY: "super-long-backup-encryption-key-0123456789",
+        AUDIT_CHAIN_VERIFY_CRON: "0 2 * * *",
         RATE_LIMIT_BACKEND: "redis",
         REDIS_REST_URL: "https://redis.example.com",
         REDIS_REST_TOKEN: "super-long-redis-token-value-123456"
@@ -233,7 +234,7 @@ describe("env config guard", () => {
   it("rejects production startup when malware scanner provider is stub", () => {
     expect(() =>
       validateStartupConfig({
-        DATABASE_URL: "file:./dev.db",
+        DATABASE_URL: "postgresql://app:password@localhost/valdoc",
         JWT_SECRET: "super-long-test-secret-0123456789",
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
@@ -248,7 +249,7 @@ describe("env config guard", () => {
   it("rejects production startup when managed malware scanner is selected without endpoint/token", () => {
     expect(() =>
       validateStartupConfig({
-        DATABASE_URL: "file:./dev.db",
+        DATABASE_URL: "postgresql://app:password@localhost/valdoc",
         JWT_SECRET: "super-long-test-secret-0123456789",
         CUSTOMER_ID: "qa-org",
         ORG_NAME: "QA Organization",
@@ -260,5 +261,47 @@ describe("env config guard", () => {
         MANAGED_MALWARE_SCAN_TOKEN: ""
       })
     ).toThrow(/MANAGED_MALWARE_SCAN/);
+  });
+
+  it("rejects startup when CLIENT_FEATURE_FLAGS_JSON contains unknown flags", () => {
+    expect(() =>
+      validateStartupConfig({
+        DATABASE_URL: "postgresql://app:password@localhost/valdoc",
+        JWT_SECRET: "super-long-test-secret-0123456789",
+        CUSTOMER_ID: "qa-org",
+        ORG_NAME: "QA Organization",
+        CLIENT_FEATURE_FLAGS_JSON: JSON.stringify({ DOES_NOT_EXIST: true })
+      })
+    ).toThrow(/Unknown feature flag/);
+  });
+
+  it("rejects production startup when database is not postgres", () => {
+    expect(() =>
+      validateStartupConfig({
+        DATABASE_URL: "file:./dev.db",
+        JWT_SECRET: "super-long-test-secret-0123456789",
+        CUSTOMER_ID: "qa-org",
+        ORG_NAME: "QA Organization",
+        NODE_ENV: "production",
+        MALWARE_SCANNER_PROVIDER: "clamav",
+        BACKUP_ENCRYPTION_KEY: "super-long-backup-encryption-key-0123456789",
+        RATE_LIMIT_BACKEND: "gateway"
+      })
+    ).toThrow(/DATABASE_URL/);
+  });
+
+  it("rejects production startup when audit-chain schedule is missing", () => {
+    expect(() =>
+      validateStartupConfig({
+        DATABASE_URL: "postgresql://app:password@localhost/valdoc",
+        JWT_SECRET: "super-long-test-secret-0123456789",
+        CUSTOMER_ID: "qa-org",
+        ORG_NAME: "QA Organization",
+        NODE_ENV: "production",
+        MALWARE_SCANNER_PROVIDER: "clamav",
+        BACKUP_ENCRYPTION_KEY: "super-long-backup-encryption-key-0123456789",
+        RATE_LIMIT_BACKEND: "gateway"
+      })
+    ).toThrow(/AUDIT_CHAIN_VERIFY_CRON/);
   });
 });

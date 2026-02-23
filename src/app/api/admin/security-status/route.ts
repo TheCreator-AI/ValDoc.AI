@@ -3,6 +3,8 @@ import { ApiError, apiJson, getSessionOrThrowWithPermission } from "@/server/api
 import { getAuthPolicy } from "@/server/auth/policy";
 import { isTwoPersonRuleEnforced } from "@/server/compliance/segregationOfDuties";
 import { getAuditSinkConfig } from "@/server/audit/sink";
+import { getFeatureFlags } from "@/server/config/features";
+import { getDeploymentReadiness } from "@/server/security/readiness";
 
 const sanitizeSinkUrlHost = (url: string | null) => {
   if (!url) return null;
@@ -18,6 +20,8 @@ export async function GET(request: Request) {
     const session = await getSessionOrThrowWithPermission(request, "organizations.manage");
     const authPolicy = getAuthPolicy();
     const sinkConfig = getAuditSinkConfig();
+    const featureFlags = getFeatureFlags();
+    const deploymentReadiness = getDeploymentReadiness(process.env);
     const [organization, chainHead] = await Promise.all([
       prisma.organization.findFirst({
         where: { id: session.organizationId },
@@ -45,7 +49,9 @@ export async function GET(request: Request) {
           enabled: sinkConfig.enabled,
           required: sinkConfig.required,
           targetHost: sanitizeSinkUrlHost(sinkConfig.url)
-        }
+        },
+        clientFeatureFlags: featureFlags,
+        deploymentReadiness
       }
     });
   } catch (error) {

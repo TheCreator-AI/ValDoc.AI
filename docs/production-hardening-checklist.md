@@ -18,8 +18,11 @@ Deployment controls required in addition to application code for GMP/Part 11-ali
 - CSRF same-origin guard enabled for unsafe authenticated API methods.
 - Rate limiting enabled for login, signing, uploads, and evidence export.
 - Use distributed rate limiting in production (`RATE_LIMIT_BACKEND=redis`) or enforce equivalent controls at API gateway/WAF.
+- Set `AUDIT_CHAIN_VERIFY_CRON` and run scheduled verify-chain controls with retained reports.
+- Configure `MALWARE_SCANNER_PROVIDER=clamav|managed` (no stub scanner in production).
 - Secure response headers enabled (CSP, X-Frame-Options, nosniff, etc.).
 - Startup config validation blocks insecure OpenSearch flags and default MinIO credentials in production.
+- Startup config validation requires PostgreSQL (`DATABASE_URL=postgres://...`) in production.
 
 ## Secrets and Keys
 - Store secrets in a managed secret store/KMS.

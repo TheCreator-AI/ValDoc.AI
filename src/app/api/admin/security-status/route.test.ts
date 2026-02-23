@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   getAuthPolicy: vi.fn(),
   isTwoPersonRuleEnforced: vi.fn(),
   getAuditSinkConfig: vi.fn(),
+  getFeatureFlags: vi.fn(),
+  getDeploymentReadiness: vi.fn(),
   findAuditChainHead: vi.fn(),
   findOrganization: vi.fn()
 }));
@@ -28,6 +30,14 @@ vi.mock("@/server/compliance/segregationOfDuties", () => ({
 
 vi.mock("@/server/audit/sink", () => ({
   getAuditSinkConfig: mocks.getAuditSinkConfig
+}));
+
+vi.mock("@/server/config/features", () => ({
+  getFeatureFlags: mocks.getFeatureFlags
+}));
+
+vi.mock("@/server/security/readiness", () => ({
+  getDeploymentReadiness: mocks.getDeploymentReadiness
 }));
 
 vi.mock("@/server/db/prisma", () => ({
@@ -60,6 +70,17 @@ describe("GET /api/admin/security-status", () => {
       timeoutMs: 1500,
       hasApiKey: true
     });
+    mocks.getFeatureFlags.mockReturnValue({
+      TEMPLATE_SUGGESTIONS: true,
+      EXECUTED_SUMMARY_GENERATION: true,
+      SCHEDULED_AUDIT_CHAIN_VERIFICATION: true,
+      STRICT_EXPORT_ANTI_ENUMERATION: true
+    });
+    mocks.getDeploymentReadiness.mockReturnValue({
+      ready: true,
+      environment: "production",
+      checks: [{ key: "database_posture", status: "pass", message: "ok" }]
+    });
     mocks.findAuditChainHead.mockResolvedValue({ headHash: "abc123" });
     mocks.findOrganization.mockResolvedValue({ id: "org1", name: "Amnion" });
   });
@@ -73,6 +94,8 @@ describe("GET /api/admin/security-status", () => {
     expect(body.controls.twoPersonRule.enforced).toBe(true);
     expect(body.controls.auditChain.headPresent).toBe(true);
     expect(body.controls.auditSink.enabled).toBe(true);
+    expect(body.controls.clientFeatureFlags.TEMPLATE_SUGGESTIONS).toBe(true);
+    expect(body.controls.deploymentReadiness.ready).toBe(true);
   });
 
   it("enforces admin-level permission check", async () => {

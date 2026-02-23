@@ -308,7 +308,27 @@ Guardrails:
 - `npm run config:check` also fails production startup when:
   - `OPENSEARCH_URL` is not `https://...`
   - `OPENSEARCH_USERNAME` / `OPENSEARCH_PASSWORD` are missing while OpenSearch is enabled
+  - `RATE_LIMIT_BACKEND` is not `redis` or `gateway`
+  - `RATE_LIMIT_BACKEND=redis` without `REDIS_REST_URL=https://...` and strong `REDIS_REST_TOKEN`
+  - `MALWARE_SCANNER_PROVIDER` is `stub`, or managed scanner credentials are incomplete
+  - `BACKUP_ENCRYPTION_KEY` is missing/weak
+  - `CLIENT_FEATURE_FLAGS_JSON` contains unknown or invalid flag values
 - `npm run config:compose:check` fails CI if non-dev compose files contain insecure OpenSearch settings.
+- Admin security posture endpoint (`/api/admin/security-status`) includes deployment readiness checks
+  for PostgreSQL posture, rate limiting backend, malware scanning, audit-chain scheduling, backup key strength,
+  OpenSearch security, and MinIO defaults.
+
+Client-specific behavior (single-tenant safe):
+- Set `CLIENT_FEATURE_FLAGS_JSON` per deployment environment to enable/disable allowed overrides without branching code.
+- Example:
+```json
+{"TEMPLATE_SUGGESTIONS":false,"EXECUTED_SUMMARY_GENERATION":true}
+```
+- Supported flags:
+  - `TEMPLATE_SUGGESTIONS`
+  - `EXECUTED_SUMMARY_GENERATION`
+  - `SCHEDULED_AUDIT_CHAIN_VERIFICATION`
+  - `STRICT_EXPORT_ANTI_ENUMERATION`
 
 OpenSearch production hardening guidance:
 - `docs/opensearch-production-hardening.md`
